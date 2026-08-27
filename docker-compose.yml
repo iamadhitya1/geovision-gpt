@@ -1,0 +1,92 @@
+# GeoVisionGPT — local-full profile.
+#
+# Brings up PostgreSQL (with PostGIS), Redis and MinIO alongside the API, matching the
+# production topology. Requires Docker Desktop.
+#
+#   docker compose up -d
+#   docker compose exec api alembic upgrade head
+#
+# Without Docker, the local-lite profile (SQLite + in-memory cache) runs the same code:
+#   cd backend && uvicorn app.main:app --reload
+
+name: geovision-gpt
+
+services:
+  postgres:
+    # PostGIS is required from Module 9 onward for geometry columns and spatial indexes.
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: geovision
+      POSTGRES_PASSWORD: geovision
+      POSTGRES_DB: geovision
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geovision -d geovision"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    # AOF persistence so rate-limit counters and the refresh-token allow-list survive a
+    # restart. Losing the allow-list would sign every user out at once.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      GVG_ENVIRONMENT: development
+      GVG_SECRET_KEY: local-compose-secret-key-change-me-at-least-32-chars
+      GVG_DATABASE_URL: postgresql+asyncpg://geovision:geovision@postgres:5432/geovision
+      GVG_CACHE_BACKEND: redis
+      GVG_REDIS_URL: redis://redis:6379/0
+      GVG_STORAGE_BACKEND: minio
+      GVG_MINIO_ENDPOINT: minio:9000
+      GVG_CORS_ORIGINS: '["http://localhost:3000"]'
+      GVG_LOG_JSON: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
