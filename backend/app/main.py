@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.api.v1.router import api_router
@@ -31,12 +33,71 @@ DESCRIPTION = """
 **GeoVisionGPT** — a multi-modal Visual Question Answering system for satellite and Earth
 observation imagery, built on vision-language models.
 
-Module 1 (Authentication) is implemented. Modules 2-10 register additional routers under
-the same `/api/v1` prefix.
+Module 1 (**Authentication**) is implemented below. Modules 2-10 will register additional
+sections under the same `/api/v1` prefix as they land.
 
-**Roles** — `guest` (read-only), `researcher` (full analysis), `admin` (administration).
-Role checks are hierarchical: an admin satisfies any researcher requirement.
+### New here? Try this first
+
+1. Open **Authentication → POST /auth/login**, click **Try it out**.
+   The form is pre-filled with the bootstrap admin account — just click **Execute**.
+2. Copy the `access_token` from the response.
+3. Click the green **Authorize** button at the top of this page, paste the token, and
+   confirm.
+4. Every endpoint below will now run as that logged-in admin — try **Users → GET /users**.
+
+### Roles
+
+| Role | Can do |
+|---|---|
+| `guest` | Read-only access |
+| `researcher` | Full analysis workflow — the default role on self-registration |
+| `admin` | Everything a researcher can, plus user management |
+
+Checks are hierarchical: an `admin` automatically satisfies any `researcher` requirement.
+
+### Errors
+
+Every error — validation, auth, not-found, rate limit — comes back in one consistent
+shape: `{"code", "message", "detail", "request_id"}`. See **ErrorResponse** under Schemas.
 """
+
+# Controls both the grouping *and* the top-to-bottom order sections appear in below —
+# without this, FastAPI falls back to whichever order routers happened to be registered
+# in, which is what made the page read as an unordered dump on first glance.
+OPENAPI_TAGS: list[dict[str, str]] = [
+    {
+        "name": "Authentication",
+        "description": (
+            "Register, log in, refresh a session, log out, change password. Login and "
+            "refresh both return a short-lived `access_token` (30 min) and a "
+            "single-use `refresh_token` (14 days) — see the **Roles** note above."
+        ),
+    },
+    {
+        "name": "Users",
+        "description": (
+            "Self-service profile (`/users/me`) plus admin-only user management "
+            "(list, read, promote/deactivate, audit trail). Admin routes require the "
+            "**Authorize** step above with an admin account's token."
+        ),
+    },
+    {
+        "name": "System",
+        "description": "Liveness and readiness probes — no authentication required.",
+    },
+]
+
+# Trims the parts of stock Swagger UI that make a first visit feel unreadable: an
+# untouched schema tree at the bottom, no persisted token across reloads, and no way to
+# search 10+ endpoints without scrolling.
+SWAGGER_UI_PARAMETERS: dict[str, Any] = {
+    "persistAuthorization": True,  # survive a page refresh instead of re-pasting the token
+    "docExpansion": "list",  # endpoints as one-line summaries, not pre-expanded forms
+    "defaultModelsExpandDepth": 0,  # the Schemas section stays collapsed until asked for
+    "displayRequestDuration": True,
+    "filter": True,  # adds a search box once there are enough endpoints to need one
+    "tryItOutEnabled": True,
+}
 
 
 def build_state(app: FastAPI, settings: Settings) -> None:
@@ -100,6 +161,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description=DESCRIPTION,
         version="0.1.0",
         lifespan=lifespan,
+        openapi_tags=OPENAPI_TAGS,
+        swagger_ui_parameters=SWAGGER_UI_PARAMETERS,
         docs_url=None if settings.is_production else "/docs",
         redoc_url=None if settings.is_production else "/redoc",
         openapi_url=None if settings.is_production else "/openapi.json",
@@ -122,6 +185,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    if not settings.is_production:
+        # The bare origin 404s otherwise, which is a confusing first impression when
+        # someone opens http://localhost:8000 without already knowing about /docs.
+        @app.get("/", include_in_schema=False)
+        async def _root_redirect() -> RedirectResponse:
+            return RedirectResponse(url="/docs")
 
     return app
 

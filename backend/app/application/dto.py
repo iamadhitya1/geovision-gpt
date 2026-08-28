@@ -26,7 +26,16 @@ NameStr = Annotated[str, Field(min_length=1, max_length=120)]
 
 
 class RegisterRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "email": "researcher@geovisiongpt.io",
+                "full_name": "Ada Lovelace",
+                "password": "Ge0Vision_Strong_2026",
+            }
+        },
+    )
 
     email: EmailStr
     full_name: NameStr
@@ -40,7 +49,17 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    # The example matches the bootstrap admin created on first startup, so a first-time
+    # reader can click "Try it out" -> "Execute" with zero edits and see a real result.
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "email": "admin@geovisiongpt.io",
+                "password": "ChangeMe_Admin_123",
+            }
+        },
+    )
 
     email: EmailStr
     password: str
@@ -52,16 +71,34 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {"refresh_token": "<paste the refresh_token from your login response>"}
+        }
+    )
+
     refresh_token: str = Field(min_length=1)
 
 
 class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "current_password": "ChangeMe_Admin_123",
+                "new_password": "An0ther_Strong_2026",
+            }
+        }
+    )
+
     current_password: str = Field(min_length=1)
     new_password: PasswordStr
 
 
 class UpdateProfileRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={"example": {"full_name": "Ada Lovelace"}},
+    )
 
     full_name: NameStr | None = None
 
@@ -69,6 +106,10 @@ class UpdateProfileRequest(BaseModel):
 class AdminUpdateUserRequest(BaseModel):
     """Admin-only mutations, kept apart from self-service updates so that role
     escalation can never ride in on a profile edit."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"role": "admin", "is_active": True, "is_verified": True}}
+    )
 
     role: Role | None = None
     is_active: bool | None = None
@@ -79,6 +120,17 @@ class AdminUpdateUserRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+                "expires_in": 1800,
+            }
+        }
+    )
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -95,6 +147,21 @@ class TokenResponse(BaseModel):
 
 
 class UserRead(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "6bdc72d1-dc8a-4dc0-a972-082f42c25c76",
+                "email": "researcher@geovisiongpt.io",
+                "full_name": "Ada Lovelace",
+                "role": "researcher",
+                "is_active": True,
+                "is_verified": False,
+                "created_at": "2026-08-27T09:15:13.280499Z",
+                "last_login_at": "2026-08-27T09:19:12.817502Z",
+            }
+        }
+    )
+
     id: UUID
     email: EmailStr
     full_name: str
@@ -167,7 +234,22 @@ class MessageResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """The single error shape emitted by the API."""
+    """The single error shape emitted by the API.
+
+    Every error the API returns — validation, auth, not-found, rate limit, anything —
+    has exactly this shape, so a client only ever needs one error-handling code path.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "code": "invalid_credentials",
+                "message": "Incorrect email or password.",
+                "detail": {},
+                "request_id": "4833200cf6764c68b9198cb2f674427e",
+            }
+        }
+    )
 
     code: str
     message: str

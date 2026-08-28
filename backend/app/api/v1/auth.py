@@ -147,6 +147,8 @@ async def logout_all(
     service: AuthServiceDep,
     context: ContextDep,
 ) -> MessageResponse:
+    """Use this after a device is lost or a credential may have leaked — it invalidates
+    every refresh token issued to this account, on every device, in one call."""
     await service.logout_everywhere(current_user, context)
     return MessageResponse(message="All sessions have been ended.")
 
@@ -174,4 +176,5 @@ async def change_password(
 
 @router.get("/me", response_model=UserRead, summary="Current authenticated user")
 async def me(current_user: CurrentUser) -> UserRead:
+    """A quick way to confirm a bearer token is valid and see who it belongs to."""
     return UserRead.from_domain(current_user)

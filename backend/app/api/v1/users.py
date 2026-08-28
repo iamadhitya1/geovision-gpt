@@ -35,6 +35,8 @@ ContextDep = Annotated[RequestContext, Depends(get_request_context)]
 
 @router.get("/me", response_model=UserRead, summary="Own profile")
 async def read_own_profile(current_user: CurrentUser) -> UserRead:
+    """Identical response to `GET /auth/me`; kept here too so profile reads and profile
+    writes live under the same `/users/me` path."""
     return UserRead.from_domain(current_user)
 
 
