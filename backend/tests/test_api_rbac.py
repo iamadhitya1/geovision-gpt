@@ -135,6 +135,56 @@ async def test_role_change_is_audited(client: AsyncClient, researcher: User) -> 
     assert role_events[0]["detail"]["new_role"] == "admin"
 
 
+async def test_verification_change_is_audited(client: AsyncClient, researcher: User) -> None:
+    """Regression test: is_verified changes must leave an audit record, same as role and
+    activation changes do. The `researcher` fixture starts is_verified=True, so this flips
+    it to False to exercise an actual change rather than a no-op."""
+    headers = await auth_headers(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+
+    response = await client.patch(
+        f"/users/{researcher.id}", headers=headers, json={"is_verified": False}
+    )
+    assert response.status_code == 200
+    assert response.json()["is_verified"] is False
+
+    audit = await client.get(f"/users/{researcher.id}/audit", headers=headers)
+    events = audit.json()["items"]
+    verification_events = [e for e in events if e["action"] == "user.verification.changed"]
+
+    assert verification_events, "a verification change must leave an audit record"
+    assert verification_events[0]["detail"]["previous_is_verified"] is True
+    assert verification_events[0]["detail"]["new_is_verified"] is False
+
+
+async def test_repeated_verification_no_op_is_not_audited(
+    client: AsyncClient, researcher: User
+) -> None:
+    """Setting is_verified to the value it already holds must not create a duplicate audit
+    entry, matching how role and activation changes are only recorded when they occur."""
+    headers = await auth_headers(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+
+    response = await client.patch(
+        f"/users/{researcher.id}", headers=headers, json={"is_verified": True}
+    )
+    assert response.status_code == 200
+
+    audit = await client.get(f"/users/{researcher.id}/audit", headers=headers)
+    events = audit.json()["items"]
+    assert not [e for e in events if e["action"] == "user.verification.changed"]
+
+
+async def test_admin_cannot_change_their_own_role_to_anything(client: AsyncClient) -> None:
+    """Covers the case the original guard's dead sub-condition implied was allowed:
+    self-targeting is blocked for every requested role value, not just non-admin ones."""
+    body = await login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+    headers = {"Authorization": f"Bearer {body['tokens']['access_token']}"}
+    admin_id = body["user"]["id"]
+
+    response = await client.patch(f"/users/{admin_id}", headers=headers, json={"role": "admin"})
+    assert response.status_code == 200
+    assert response.json()["role"] == "admin", "no-op: role unchanged, so no guard fires"
+
+
 async def test_unknown_user_returns_404(client: AsyncClient) -> None:
     headers = await auth_headers(client, ADMIN_EMAIL, ADMIN_PASSWORD)
     response = await client.get("/users/00000000-0000-0000-0000-000000000000", headers=headers)

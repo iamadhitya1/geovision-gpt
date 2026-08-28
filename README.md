@@ -61,10 +61,10 @@ $env:GVG_SECRET_KEY = "local-dev-secret-key-at-least-32-characters-long"; uvicor
 Then open <http://localhost:8000/docs>.
 
 On first start the bootstrap administrator is created from `GVG_FIRST_ADMIN_*`
-(default `admin@geovisiongpt.io` / `ChangeMe_Admin_123`). **Change it.** In production the
+(default `admin@geovisiongpt.io` / `ChangeMe_Please_2026`). **Change it.** In production the
 app refuses to start with the default password.
 
-## Full stack (PostgreSQL + Redis + MinIO)
+## Full stack (PostgreSQL + Redis + MinIO + NGINX)
 
 ```bash
 docker compose up -d
@@ -73,6 +73,11 @@ docker compose up -d
 ```bash
 docker compose exec api alembic upgrade head
 ```
+
+Enter through NGINX at <http://localhost/api/v1/> — the `api` container has no port
+published to the host on purpose. NGINX is the trust boundary the per-IP rate limiter
+relies on (it overwrites `X-Forwarded-For` with the real connecting IP); talking to `api`
+directly would let a caller spoof that header and bypass rate limiting.
 
 ## Deployment profiles
 

@@ -1,10 +1,16 @@
 # GeoVisionGPT — local-full profile.
 #
-# Brings up PostgreSQL (with PostGIS), Redis and MinIO alongside the API, matching the
-# production topology. Requires Docker Desktop.
+# Brings up PostgreSQL (with PostGIS), Redis, MinIO and NGINX alongside the API, matching
+# the production topology. Requires Docker Desktop.
 #
 #   docker compose up -d
 #   docker compose exec api alembic upgrade head
+#
+# Enter through NGINX (http://localhost/api/v1/...), not the api container's own port.
+# NGINX is the trust boundary app/api/deps.py::client_ip() relies on: it overwrites
+# X-Forwarded-For with the real connecting IP before proxying, which is what makes the
+# per-IP rate limiter trustworthy. The api service intentionally does not publish its
+# port to the host, so that boundary can't be bypassed by talking to it directly.
 #
 # Without Docker, the local-lite profile (SQLite + in-memory cache) runs the same code:
 #   cd backend && uvicorn app.main:app --reload
@@ -75,8 +81,10 @@ services:
       GVG_MINIO_ENDPOINT: minio:9000
       GVG_CORS_ORIGINS: '["http://localhost:3000"]'
       GVG_LOG_JSON: "false"
-    ports:
-      - "8000:8000"
+    # No host port published: NGINX is the only entrypoint, so the rate limiter's trust
+    # in X-Forwarded-For can't be bypassed by reaching this container directly.
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,6 +92,16 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

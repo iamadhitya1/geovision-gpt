@@ -27,7 +27,7 @@ from app.infrastructure.security.tokens import JwtTokenService
 from app.main import create_app
 
 ADMIN_EMAIL = "admin@geovisiongpt.io"
-ADMIN_PASSWORD = "AdminPass_2026x"
+ADMIN_PASSWORD = "Ge0Vision_Root_2026"  # must not contain the email local-part "admin"
 USER_PASSWORD = "ResearchPass_2026x"
 
 

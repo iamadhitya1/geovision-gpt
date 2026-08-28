@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.application.password_policy import PasswordPolicy
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.domain.entities import User
@@ -17,7 +18,7 @@ from app.infrastructure.db.repositories import SqlAlchemyUserRepository
 
 logger = get_logger(__name__)
 
-_INSECURE_DEFAULT_PASSWORD = "ChangeMe_Admin_123"
+_INSECURE_DEFAULT_PASSWORD = "ChangeMe_Please_2026"
 
 
 async def ensure_first_admin(
@@ -29,7 +30,10 @@ async def ensure_first_admin(
 
     Refuses to run in production with the shipped default password — a deployment that
     silently creates a publicly-known admin credential is worse than one that fails to
-    start.
+    start. The password is also checked against the same :class:`PasswordPolicy` every
+    other account is held to; without this, a weak ``GVG_FIRST_ADMIN_PASSWORD`` would
+    silently create the platform's highest-privilege account with a password that
+    ``POST /auth/register`` would reject outright for anyone else.
     """
     email = settings.first_admin_email.lower()
     password = settings.first_admin_password.get_secret_value()
@@ -46,6 +50,11 @@ async def ensure_first_admin(
         if await repository.exists_by_email(email):
             logger.debug("bootstrap_admin_exists", email=email)
             return
+
+        # Validated only on the create path: a policy tightened after an admin already
+        # exists must not turn every subsequent restart into a startup failure for a
+        # password that was acceptable when the account was actually created.
+        PasswordPolicy(min_length=settings.password_min_length).validate(password, email=email)
 
         admin = User(
             email=email,

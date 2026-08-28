@@ -81,8 +81,13 @@ class UserService:
         target = await self.get(target_id)
 
         if request.role is not None and request.role is not target.role:
-            if actor.id == target.id and request.role is not Role.ADMIN:
-                raise AuthorizationError("An administrator cannot demote their own account.")
+            # No "unless re-affirming ADMIN" carve-out: reaching this endpoint already
+            # requires the caller to be an admin, so self-targeting (actor.id == target.id)
+            # implies target.role is already ADMIN — combined with the outer `is not
+            # target.role` check, request.role can never legitimately equal ADMIN here.
+            # Self-role-changes are simply always blocked, for any requested value.
+            if actor.id == target.id:
+                raise AuthorizationError("An administrator cannot change their own role.")
             previous = target.role
             target.change_role(request.role)
             await self._audit.record(
@@ -110,8 +115,17 @@ class UserService:
                 actor_id=str(actor.id),
             )
 
-        if request.is_verified is not None:
+        if request.is_verified is not None and request.is_verified is not target.is_verified:
+            previous_verified = target.is_verified
             target.is_verified = request.is_verified
+            await self._audit.record(
+                action=AuditAction.VERIFICATION_CHANGED,
+                user_id=target.id,
+                context=context,
+                actor_id=str(actor.id),
+                previous_is_verified=previous_verified,
+                new_is_verified=request.is_verified,
+            )
 
         updated = await self._users.update(target)
         await self._uow.commit()

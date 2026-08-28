@@ -60,6 +60,7 @@ class AuditAction(StrEnum):
     ROLE_CHANGED = "user.role.changed"
     USER_DEACTIVATED = "user.deactivated"
     USER_ACTIVATED = "user.activated"
+    VERIFICATION_CHANGED = "user.verification.changed"
     ACCESS_DENIED = "authz.access_denied"
 
 

@@ -56,7 +56,7 @@ class LoginRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "email": "admin@geovisiongpt.io",
-                "password": "ChangeMe_Admin_123",
+                "password": "ChangeMe_Please_2026",
             }
         },
     )
@@ -84,7 +84,7 @@ class ChangePasswordRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "current_password": "ChangeMe_Admin_123",
+                "current_password": "ChangeMe_Please_2026",
                 "new_password": "An0ther_Strong_2026",
             }
         }

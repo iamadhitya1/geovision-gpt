@@ -78,7 +78,10 @@ class Settings(BaseSettings):
     # Must be a routable domain: reserved TLDs (.local, .test, .example, .invalid) are
     # rejected by email validation, which would make the bootstrap admin unserialisable.
     first_admin_email: str = "admin@geovisiongpt.io"
-    first_admin_password: SecretStr = SecretStr("ChangeMe_Admin_123")
+    # Must not contain the local part of first_admin_email ("admin") — PasswordPolicy
+    # rejects a password containing the account's own email local-part, and the bootstrap
+    # path now enforces that policy (see infrastructure/bootstrap.py::ensure_first_admin).
+    first_admin_password: SecretStr = SecretStr("ChangeMe_Please_2026")
     first_admin_name: str = "Platform Administrator"
 
     # --- Inference backend (Modules 6/7) ------------------------------------
