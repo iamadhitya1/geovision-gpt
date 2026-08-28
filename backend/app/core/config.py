@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     minio_secret_key: SecretStr = SecretStr("minioadmin")
     minio_bucket: str = "geovision"
 
+    # --- Image uploads (Module 2) --------------------------------------------
+    max_upload_size_mb: int = Field(default=200, ge=1, le=2048)
+    thumbnail_max_size_px: int = Field(default=512, ge=64, le=4096)
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
+
     # --- Bootstrap admin -----------------------------------------------------
     # Must be a routable domain: reserved TLDs (.local, .test, .example, .invalid) are
     # rejected by email validation, which would make the bootstrap admin unserialisable.

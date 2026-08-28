@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.audit_service import AuditService
 from app.application.auth_service import AuthService
 from app.application.dto import RequestContext
+from app.application.image_service import ImageService
 from app.application.password_policy import PasswordPolicy
 from app.application.user_service import UserService
 from app.core.config import Settings
@@ -37,6 +38,9 @@ from app.domain.errors import AuthorizationError, InactiveUserError, InvalidToke
 from app.domain.interfaces import (
     AuditRepository,
     Cache,
+    ImageAnalyzer,
+    ImageRepository,
+    ObjectStorage,
     PasswordHasher,
     RateLimiter,
     TokenService,
@@ -46,6 +50,7 @@ from app.domain.interfaces import (
 from app.infrastructure.cache.rate_limiter import FixedWindowRateLimiter, NullRateLimiter
 from app.infrastructure.db.repositories import (
     SqlAlchemyAuditRepository,
+    SqlAlchemyImageRepository,
     SqlAlchemyUserRepository,
 )
 from app.infrastructure.db.session import SqlAlchemyUnitOfWork
@@ -74,6 +79,14 @@ def get_token_service(request: Request) -> TokenService:
 
 def get_password_policy(request: Request) -> PasswordPolicy:
     return request.app.state.password_policy  # type: ignore[no-any-return]
+
+
+def get_storage(request: Request) -> ObjectStorage:
+    return request.app.state.storage  # type: ignore[no-any-return]
+
+
+def get_image_analyzer(request: Request) -> ImageAnalyzer:
+    return request.app.state.image_analyzer  # type: ignore[no-any-return]
 
 
 def get_rate_limiter(
@@ -117,6 +130,10 @@ def get_audit_repository(session: SessionDep) -> AuditRepository:
     return SqlAlchemyAuditRepository(session)
 
 
+def get_image_repository(session: SessionDep) -> ImageRepository:
+    return SqlAlchemyImageRepository(session)
+
+
 def get_unit_of_work(session: SessionDep) -> UnitOfWork:
     return SqlAlchemyUnitOfWork(session)
 
@@ -155,6 +172,25 @@ def get_user_service(
     uow: Annotated[UnitOfWork, Depends(get_unit_of_work)],
 ) -> UserService:
     return UserService(users=users, audit=audit, uow=uow)
+
+
+def get_image_service(
+    images: Annotated[ImageRepository, Depends(get_image_repository)],
+    storage: Annotated[ObjectStorage, Depends(get_storage)],
+    analyzer: Annotated[ImageAnalyzer, Depends(get_image_analyzer)],
+    audit: Annotated[AuditService, Depends(get_audit_service)],
+    uow: Annotated[UnitOfWork, Depends(get_unit_of_work)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> ImageService:
+    return ImageService(
+        images=images,
+        storage=storage,
+        analyzer=analyzer,
+        audit=audit,
+        uow=uow,
+        max_upload_size_bytes=settings.max_upload_size_bytes,
+        thumbnail_max_size_px=settings.thumbnail_max_size_px,
+    )
 
 
 # --- Caller context -----------------------------------------------------------

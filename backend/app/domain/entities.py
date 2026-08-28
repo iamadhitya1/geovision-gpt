@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.domain.enums import AuditAction, AuditOutcome, Role
+from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
 
 
 def _now() -> datetime:
@@ -103,6 +103,77 @@ class TokenClaims:
     issued_at: datetime
     expires_at: datetime
     token_version: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class ImageMetadata:
+    """Everything extracted by inspecting the raster itself, as opposed to what the
+    uploader claimed. ``width_px``/``height_px``/``band_count``/``dtype`` apply to every
+    format; the geospatial fields are populated only when the source carries embedded
+    georeferencing, which in practice means GeoTIFF with a CRS actually set.
+    """
+
+    width_px: int
+    height_px: int
+    band_count: int
+    dtype: str  # e.g. "uint8", "uint16", "float32" — the raster's native pixel type
+
+    crs: str | None = None  # e.g. "EPSG:4326"; None when the source has no georeferencing
+    pixel_size_x: float | None = None  # native-CRS units per pixel (not always metres)
+    pixel_size_y: float | None = None
+    gsd_meters_approx: float | None = None  # approximate ground sample distance, in metres
+    bounds_native: tuple[float, float, float, float] | None = None  # minx,miny,maxx,maxy
+    bounds_wgs84: tuple[float, float, float, float] | None = None  # west,south,east,north
+
+    # A brightness-ratio heuristic, not a real cloud mask — see the SGV research doc for
+    # why this project doesn't trust a VLM's own cloud-cover guess either. None when the
+    # image has fewer than 3 bands (the heuristic needs RGB-like channels to be meaningful).
+    cloud_cover_percent: float | None = None
+
+
+@dataclass(slots=True)
+class SatelliteImage:
+    """An uploaded raster and everything known about it.
+
+    ``metadata`` is ``None`` until processing finishes (or forever, if it fails) — the
+    entity is created and persisted immediately on upload so the record exists even if
+    extraction subsequently fails, and ``error_message`` explains why.
+    """
+
+    owner_id: UUID
+    original_filename: str
+    image_format: ImageFormat
+    storage_key: str
+    file_size_bytes: int
+    checksum_sha256: str
+    id: UUID = field(default_factory=uuid4)
+    status: ImageStatus = ImageStatus.UPLOADED
+    thumbnail_key: str | None = None
+    metadata: ImageMetadata | None = None
+    error_message: str | None = None
+    created_at: datetime = field(default_factory=_now)
+    updated_at: datetime = field(default_factory=_now)
+
+    def mark_processing(self) -> None:
+        self.status = ImageStatus.PROCESSING
+        self.updated_at = _now()
+
+    def mark_ready(self, metadata: ImageMetadata, *, thumbnail_key: str | None) -> None:
+        """``thumbnail_key`` is Optional: thumbnailing is best-effort and a failure there
+        must not turn a successful upload with valid metadata into a failed one."""
+        self.status = ImageStatus.READY
+        self.metadata = metadata
+        self.thumbnail_key = thumbnail_key
+        self.error_message = None
+        self.updated_at = _now()
+
+    def mark_failed(self, reason: str) -> None:
+        self.status = ImageStatus.FAILED
+        self.error_message = reason
+        self.updated_at = _now()
+
+    def is_owned_by(self, user_id: UUID) -> bool:
+        return self.owner_id == user_id
 
 
 @dataclass(slots=True)

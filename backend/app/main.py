@@ -24,8 +24,10 @@ from app.core.logging import configure_logging, get_logger
 from app.infrastructure.bootstrap import ensure_first_admin
 from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
+from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
 from app.infrastructure.security.password import Argon2PasswordHasher
 from app.infrastructure.security.tokens import JwtTokenService
+from app.infrastructure.storage.factory import build_storage
 
 logger = get_logger(__name__)
 
@@ -33,8 +35,8 @@ DESCRIPTION = """
 **GeoVisionGPT** — a multi-modal Visual Question Answering system for satellite and Earth
 observation imagery, built on vision-language models.
 
-Module 1 (**Authentication**) is implemented below. Modules 2-10 will register additional
-sections under the same `/api/v1` prefix as they land.
+Modules 1 (**Authentication**) and 2 (**Images**) are implemented below. Modules 3-10
+will register additional sections under the same `/api/v1` prefix as they land.
 
 ### New here? Try this first
 
@@ -82,6 +84,15 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         ),
     },
     {
+        "name": "Images",
+        "description": (
+            "Upload and manage satellite imagery — GeoTIFF, PNG, or JPEG. Uploads are "
+            "content-sniffed, not trusted by extension; a GeoTIFF's CRS, bounds, ground "
+            "sample distance, and a heuristic cloud-coverage estimate are extracted "
+            "automatically. A researcher sees only their own uploads; an admin sees all."
+        ),
+    },
+    {
         "name": "System",
         "description": "Liveness and readiness probes — no authentication required.",
     },
@@ -120,6 +131,8 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         refresh_token_expire_days=settings.refresh_token_expire_days,
     )
     app.state.password_policy = PasswordPolicy(min_length=settings.password_min_length)
+    app.state.storage = build_storage(settings)
+    app.state.image_analyzer = RasterImageAnalyzer()
 
 
 @asynccontextmanager

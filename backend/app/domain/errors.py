@@ -85,6 +85,27 @@ class WeakPasswordError(ValidationError):
     message = "The password does not meet the strength policy."
 
 
+# --- Image management --------------------------------------------------------
+
+
+class UnsupportedFileTypeError(ValidationError):
+    code = "unsupported_file_type"
+    message = "This file type is not supported. Upload a GeoTIFF, PNG, or JPEG."
+
+
+class FileTooLargeError(ValidationError):
+    code = "file_too_large"
+    message = "The uploaded file exceeds the maximum allowed size."
+
+
+class CorruptImageError(ValidationError):
+    code = "corrupt_image"
+    message = (
+        "The file's contents don't match a valid image of the claimed type — it may be "
+        "corrupt, empty, or mislabeled."
+    )
+
+
 class RateLimitExceededError(DomainError):
     code = "rate_limit_exceeded"
     message = "Too many requests. Please try again later."

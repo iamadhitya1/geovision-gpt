@@ -11,11 +11,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Uuid, func
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.entities import AuditEvent, User
-from app.domain.enums import AuditAction, AuditOutcome, Role
+from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, User
+from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
 from app.infrastructure.db.base import Base, ensure_utc
 
 
@@ -73,6 +73,38 @@ class AuditEventModel(Base):
 
     # Supports the dominant analytics query: "recent events for this user".
     __table_args__ = (Index("ix_audit_user_created", "user_id", "created_at"),)
+
+
+class ImageModel(Base):
+    __tablename__ = "images"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    # CASCADE rather than audit's SET NULL: an image with no owner isn't meaningful data
+    # to retain, unlike an audit trail entry, where "someone did X" stays worth keeping
+    # even after the account is gone.
+    owner_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    image_format: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default=ImageStatus.UPLOADED.value, nullable=False
+    )
+    storage_key: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
+    thumbnail_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    checksum_sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    # Named `metadata_json`, not `metadata` — SQLAlchemy's declarative base already owns
+    # the `metadata` attribute name (the table registry), so reusing it here would shadow
+    # that rather than define a column.
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(nullable=True)
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    # Supports the dominant listing query: "this owner's images, newest first".
+    __table_args__ = (Index("ix_images_owner_created", "owner_id", "created_at"),)
 
 
 # --- Mappers -----------------------------------------------------------------
@@ -158,3 +190,90 @@ def audit_to_model(entity: AuditEvent) -> AuditEventModel:
         detail=entity.detail,
         created_at=entity.created_at,
     )
+
+
+def _metadata_to_json(metadata: ImageMetadata | None) -> dict[str, Any] | None:
+    if metadata is None:
+        return None
+    return {
+        "width_px": metadata.width_px,
+        "height_px": metadata.height_px,
+        "band_count": metadata.band_count,
+        "dtype": metadata.dtype,
+        "crs": metadata.crs,
+        "pixel_size_x": metadata.pixel_size_x,
+        "pixel_size_y": metadata.pixel_size_y,
+        "gsd_meters_approx": metadata.gsd_meters_approx,
+        "bounds_native": list(metadata.bounds_native) if metadata.bounds_native else None,
+        "bounds_wgs84": list(metadata.bounds_wgs84) if metadata.bounds_wgs84 else None,
+        "cloud_cover_percent": metadata.cloud_cover_percent,
+    }
+
+
+def _metadata_from_json(data: dict[str, Any] | None) -> ImageMetadata | None:
+    if data is None:
+        return None
+    bounds_native = data.get("bounds_native")
+    bounds_wgs84 = data.get("bounds_wgs84")
+    return ImageMetadata(
+        width_px=data["width_px"],
+        height_px=data["height_px"],
+        band_count=data["band_count"],
+        dtype=data["dtype"],
+        crs=data.get("crs"),
+        pixel_size_x=data.get("pixel_size_x"),
+        pixel_size_y=data.get("pixel_size_y"),
+        gsd_meters_approx=data.get("gsd_meters_approx"),
+        bounds_native=tuple(bounds_native) if bounds_native else None,
+        bounds_wgs84=tuple(bounds_wgs84) if bounds_wgs84 else None,
+        cloud_cover_percent=data.get("cloud_cover_percent"),
+    )
+
+
+def image_to_domain(model: ImageModel) -> SatelliteImage:
+    created = ensure_utc(model.created_at)
+    updated = ensure_utc(model.updated_at)
+    assert created is not None and updated is not None  # NOT NULL columns
+    return SatelliteImage(
+        id=model.id,
+        owner_id=model.owner_id,
+        original_filename=model.original_filename,
+        image_format=ImageFormat(model.image_format),
+        storage_key=model.storage_key,
+        file_size_bytes=model.file_size_bytes,
+        checksum_sha256=model.checksum_sha256,
+        status=ImageStatus(model.status),
+        thumbnail_key=model.thumbnail_key,
+        metadata=_metadata_from_json(model.metadata_json),
+        error_message=model.error_message,
+        created_at=created,
+        updated_at=updated,
+    )
+
+
+def image_to_model(entity: SatelliteImage) -> ImageModel:
+    return ImageModel(
+        id=entity.id,
+        owner_id=entity.owner_id,
+        original_filename=entity.original_filename,
+        image_format=entity.image_format.value,
+        status=entity.status.value,
+        storage_key=entity.storage_key,
+        thumbnail_key=entity.thumbnail_key,
+        file_size_bytes=entity.file_size_bytes,
+        checksum_sha256=entity.checksum_sha256,
+        metadata_json=_metadata_to_json(entity.metadata),
+        error_message=entity.error_message,
+        created_at=entity.created_at,
+        updated_at=entity.updated_at,
+    )
+
+
+def apply_image_changes(model: ImageModel, entity: SatelliteImage) -> ImageModel:
+    entity.updated_at = datetime.now(UTC)
+    model.updated_at = entity.updated_at
+    model.status = entity.status.value
+    model.thumbnail_key = entity.thumbnail_key
+    model.metadata_json = _metadata_to_json(entity.metadata)
+    model.error_message = entity.error_message
+    return model

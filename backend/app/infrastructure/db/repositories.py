@@ -12,15 +12,19 @@ from uuid import UUID
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.entities import AuditEvent, User
-from app.domain.enums import Role
-from app.domain.interfaces import AuditRepository, UserRepository
+from app.domain.entities import AuditEvent, SatelliteImage, User
+from app.domain.enums import ImageFormat, ImageStatus, Role
+from app.domain.interfaces import AuditRepository, ImageRepository, UserRepository
 from app.infrastructure.db.models import (
     AuditEventModel,
+    ImageModel,
     UserModel,
+    apply_image_changes,
     apply_user_changes,
     audit_to_domain,
     audit_to_model,
+    image_to_domain,
+    image_to_model,
     user_to_domain,
     user_to_model,
 )
@@ -140,3 +144,78 @@ class SqlAlchemyAuditRepository(AuditRepository):
         stmt = stmt.order_by(AuditEventModel.created_at.desc()).offset(offset).limit(limit)
         models = (await self._session.execute(stmt)).scalars().all()
         return [audit_to_domain(m) for m in models], total
+
+
+class SqlAlchemyImageRepository(ImageRepository):
+    """Satellite image persistence backed by SQLAlchemy."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, image: SatelliteImage) -> SatelliteImage:
+        model = image_to_model(image)
+        self._session.add(model)
+        await self._session.flush()
+        return image_to_domain(model)
+
+    async def get_by_id(self, image_id: UUID) -> SatelliteImage | None:
+        model = await self._session.get(ImageModel, image_id)
+        return image_to_domain(model) if model else None
+
+    async def update(self, image: SatelliteImage) -> SatelliteImage:
+        model = await self._session.get(ImageModel, image.id)
+        if model is None:
+            model = image_to_model(image)
+            self._session.add(model)
+        else:
+            apply_image_changes(model, image)
+        await self._session.flush()
+        return image_to_domain(model)
+
+    async def delete(self, image_id: UUID) -> None:
+        model = await self._session.get(ImageModel, image_id)
+        if model is not None:
+            await self._session.delete(model)
+            await self._session.flush()
+
+    async def list_images(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+        owner_id: UUID | None = None,
+        image_format: ImageFormat | None = None,
+        status: ImageStatus | None = None,
+    ) -> tuple[list[SatelliteImage], int]:
+        stmt: Select[tuple[ImageModel]] = select(ImageModel)
+        stmt = self._apply_filters(
+            stmt, owner_id=owner_id, image_format=image_format, status=status
+        )
+
+        count_stmt = self._apply_filters(
+            select(func.count()).select_from(ImageModel),
+            owner_id=owner_id,
+            image_format=image_format,
+            status=status,
+        )
+        total = int((await self._session.execute(count_stmt)).scalar_one())
+
+        stmt = stmt.order_by(ImageModel.created_at.desc()).offset(offset).limit(limit)
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [image_to_domain(m) for m in models], total
+
+    @staticmethod
+    def _apply_filters(
+        stmt: Select[tuple[ImageModel]] | Select[tuple[int]],
+        *,
+        owner_id: UUID | None,
+        image_format: ImageFormat | None,
+        status: ImageStatus | None,
+    ) -> Select:  # type: ignore[type-arg]
+        if owner_id is not None:
+            stmt = stmt.where(ImageModel.owner_id == owner_id)
+        if image_format is not None:
+            stmt = stmt.where(ImageModel.image_format == image_format.value)
+        if status is not None:
+            stmt = stmt.where(ImageModel.status == status.value)
+        return stmt

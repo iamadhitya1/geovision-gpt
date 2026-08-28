@@ -27,8 +27,8 @@ framework that turns physics-based spectral indices into a verifier for VLM clai
 
 | Module | Scope | Status |
 |---|---|---|
-| **1** | Authentication, RBAC, audit | **Complete** — 65 tests passing |
-| 2 | Satellite image management | Not started |
+| **1** | Authentication, RBAC, audit | **Complete** |
+| **2** | Satellite image management | **Complete** |
 | 3 | Preprocessing and spectral indices | Not started |
 | 4 | Feature extraction | Not started |
 | 5 | Question understanding | Not started |
@@ -92,7 +92,7 @@ Selected entirely by environment variables — no code changes.
 The in-memory cache is **rejected at startup in production**: it is per-process, so rate
 limits and session revocation would silently stop holding across replicas.
 
-## Module 1 — implemented API
+## Implemented API
 
 Base path `/api/v1`.
 
@@ -111,8 +111,28 @@ Base path `/api/v1`.
 | `GET` | `/users/{id}` | **admin** | Read a user |
 | `PATCH` | `/users/{id}` | **admin** | Change role or activation |
 | `GET` | `/users/{id}/audit` | **admin** | Audit trail |
+| `POST` | `/images` | researcher+ | Upload a GeoTIFF/PNG/JPEG |
+| `GET` | `/images` | researcher+ | List images (own only, unless admin) |
+| `GET` | `/images/{id}` | researcher+ | Read an image's extracted metadata |
+| `GET` | `/images/{id}/thumbnail` | researcher+ | Fetch the JPEG preview |
+| `DELETE` | `/images/{id}` | researcher+ | Delete an image (owner or admin) |
 | `GET` | `/health` | public | Liveness |
 | `GET` | `/ready` | public | Readiness (checks DB and cache) |
+
+### Module 2 — satellite image management
+
+- Uploads are **content-sniffed, not trusted by extension** — a renamed file that doesn't
+  match its claimed type is rejected before anything is stored.
+- GeoTIFF metadata extraction via rasterio: CRS, native bounds, bounds reprojected to
+  WGS84, ground sample distance (approximated in metres for geographic CRSs), band count
+  and dtype. A TIFF with no embedded CRS is accepted, not rejected — the geospatial fields
+  are simply `null`.
+- Cloud coverage is a **brightness-ratio heuristic**, not a real cloud mask — Module 3 owns
+  proper cloud handling. Documented as a heuristic everywhere it's surfaced.
+- Thumbnails are generated from a downsampled read (never the full-resolution raster) and
+  served as JPEG.
+- Storage is swappable by configuration: filesystem locally, MinIO/S3 behind
+  `GVG_STORAGE_BACKEND=minio`, same `ObjectStorage` port either way.
 
 ### Security properties
 
@@ -140,7 +160,7 @@ cd backend && uv run pytest -q
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app
 ```
 
-Current state: **65 tests passing**, ruff clean, mypy `--strict` clean.
+Current state: **102 tests passing**, ruff clean, mypy `--strict` clean.
 
 The suite includes `tests/test_architecture.py`, which parses the AST of every module and
 **fails the build** if `domain/` or `application/` import a framework, or if a router

@@ -7,10 +7,17 @@ which keeps rate-limit counters and refresh-token allow-lists from leaking betwe
 
 from __future__ import annotations
 
+import io
 from collections.abc import AsyncIterator
+from pathlib import Path
 
+import numpy as np
 import pytest
+import rasterio
 from httpx import ASGITransport, AsyncClient
+from PIL import Image
+from rasterio.crs import CRS
+from rasterio.transform import from_origin
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -40,7 +47,7 @@ def hasher() -> Argon2PasswordHasher:
 
 
 @pytest.fixture
-def settings() -> Settings:
+def settings(tmp_path: Path) -> Settings:
     return Settings(
         environment=Environment.DEVELOPMENT,
         debug=True,
@@ -56,6 +63,11 @@ def settings() -> Settings:
         first_admin_email=ADMIN_EMAIL,
         first_admin_password=ADMIN_PASSWORD,
         first_admin_name="Test Administrator",
+        # A per-test tmp_path, not the real ./storage default — otherwise every test run
+        # would write real files into the repo's working directory.
+        storage_backend="filesystem",
+        storage_root=str(tmp_path / "storage"),
+        max_upload_size_mb=5,
     )
 
 
@@ -155,6 +167,68 @@ async def researcher(session_factory: async_sessionmaker, hasher: Argon2Password
         return created
     finally:
         await session.close()
+
+
+# --- Synthetic image fixtures --------------------------------------------------
+#
+# Generated in-process rather than committed as binary files: it keeps the repository
+# text-only and makes every test's input data traceable to the code that produced it.
+
+
+def make_geotiff_bytes(
+    *, width: int = 64, height: int = 64, band_count: int = 3, with_crs: bool = True
+) -> bytes:
+    """A small synthetic GeoTIFF, georeferenced near Ahmedabad by default."""
+    rng = np.random.default_rng(seed=42)
+    data = rng.integers(0, 255, size=(band_count, height, width), dtype=np.uint8)
+    profile = {
+        "driver": "GTiff",
+        "dtype": "uint8",
+        "count": band_count,
+        "height": height,
+        "width": width,
+    }
+    if with_crs:
+        profile["crs"] = CRS.from_epsg(4326)
+        profile["transform"] = from_origin(72.5, 23.1, 0.0001, 0.0001)
+
+    with rasterio.io.MemoryFile() as memfile:
+        with memfile.open(**profile) as dst:
+            dst.write(data)
+        return memfile.read()
+
+
+def make_bright_geotiff_bytes(*, width: int = 64, height: int = 64) -> bytes:
+    """An all-white 3-band GeoTIFF — the cloud-coverage heuristic should score this near
+    100%, giving the metadata-extraction tests a non-trivial value to assert on."""
+    data = np.full((3, height, width), 255, dtype=np.uint8)
+    profile = {
+        "driver": "GTiff",
+        "dtype": "uint8",
+        "count": 3,
+        "height": height,
+        "width": width,
+        "crs": CRS.from_epsg(4326),
+        "transform": from_origin(72.5, 23.1, 0.0001, 0.0001),
+    }
+    with rasterio.io.MemoryFile() as memfile:
+        with memfile.open(**profile) as dst:
+            dst.write(data)
+        return memfile.read()
+
+
+def make_png_bytes(*, width: int = 32, height: int = 32) -> bytes:
+    image = Image.new("RGB", (width, height), color=(10, 120, 60))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def make_jpeg_bytes(*, width: int = 32, height: int = 32) -> bytes:
+    image = Image.new("RGB", (width, height), color=(200, 30, 30))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG")
+    return buffer.getvalue()
 
 
 async def login(client: AsyncClient, email: str, password: str) -> dict:

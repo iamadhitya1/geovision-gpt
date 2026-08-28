@@ -13,8 +13,8 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from app.domain.entities import AuditEvent, TokenClaims, User
-from app.domain.enums import Role, TokenType
+from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, TokenClaims, User
+from app.domain.enums import ImageFormat, ImageStatus, Role, TokenType
 
 
 @runtime_checkable
@@ -57,6 +57,78 @@ class AuditRepository(Protocol):
         offset: int = 0,
         limit: int = 50,
     ) -> tuple[list[AuditEvent], int]: ...
+
+
+@runtime_checkable
+class ImageRepository(Protocol):
+    """Persistence port for :class:`~app.domain.entities.SatelliteImage`."""
+
+    async def add(self, image: SatelliteImage) -> SatelliteImage: ...
+
+    async def get_by_id(self, image_id: UUID) -> SatelliteImage | None: ...
+
+    async def update(self, image: SatelliteImage) -> SatelliteImage: ...
+
+    async def delete(self, image_id: UUID) -> None: ...
+
+    async def list_images(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+        owner_id: UUID | None = None,
+        image_format: ImageFormat | None = None,
+        status: ImageStatus | None = None,
+    ) -> tuple[list[SatelliteImage], int]:
+        """``owner_id=None`` means "no ownership filter" — the admin, all-images view.
+        Owner-scoped listing is the caller's responsibility to enforce by always passing
+        the requesting user's id unless they are an admin."""
+        ...
+
+
+@runtime_checkable
+class ObjectStorage(Protocol):
+    """Binary object storage port. Filesystem in the local-lite profile, MinIO/S3 beyond it.
+
+    Deliberately just four methods over raw bytes — no presigned URLs, no multipart
+    upload — because nothing in this project yet needs them. Add methods when a real
+    caller needs them, not preemptively.
+    """
+
+    async def put(self, key: str, data: bytes, *, content_type: str) -> None: ...
+
+    async def get(self, key: str) -> bytes: ...
+
+    async def delete(self, key: str) -> None: ...
+
+    async def exists(self, key: str) -> bool: ...
+
+
+@runtime_checkable
+class ImageAnalyzer(Protocol):
+    """Raster inspection port — the only place `rasterio`/`Pillow` are allowed to be
+    imported outside `infrastructure/imaging/`.
+
+    Split into three steps rather than one "process" call because each has a distinct
+    failure mode the service needs to react to differently: a sniff mismatch is a client
+    error (422), an inspection failure after a successful sniff means the file is
+    corrupt in a way the initial check didn't catch, and thumbnailing is best-effort and
+    should not fail the whole upload if it errors.
+    """
+
+    async def sniff_format(self, data: bytes, claimed_extension: str) -> ImageFormat:
+        """Determine the file's real format from its content and confirm it matches the
+        claimed extension. Raises :class:`~app.domain.errors.CorruptImageError` or
+        :class:`~app.domain.errors.UnsupportedFileTypeError` on mismatch."""
+        ...
+
+    async def inspect(self, data: bytes, image_format: ImageFormat) -> ImageMetadata: ...
+
+    async def generate_thumbnail(
+        self, data: bytes, image_format: ImageFormat, *, max_size: int
+    ) -> bytes:
+        """Return JPEG-encoded thumbnail bytes, longest edge at most ``max_size`` px."""
+        ...
 
 
 @runtime_checkable

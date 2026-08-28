@@ -36,6 +36,44 @@ _ROLE_LEVELS: dict[Role, int] = {
 }
 
 
+class ImageFormat(StrEnum):
+    """Accepted raster formats.
+
+    ``GEOTIFF`` is the only format that can carry embedded georeferencing (CRS, affine
+    transform). PNG and JPEG are accepted for quick-look imagery that has no geospatial
+    metadata of its own — their :class:`~app.domain.entities.ImageMetadata` will always
+    have ``crs``, ``bounds_native`` and ``bounds_wgs84`` set to ``None``.
+    """
+
+    GEOTIFF = "geotiff"
+    PNG = "png"
+    JPEG = "jpeg"
+
+
+# Extensions accepted per format, lower-cased and without the leading dot. Kept as the
+# single source of truth so the upload endpoint's whitelist and the content-sniffing step
+# can never silently drift apart from each other.
+IMAGE_FORMAT_EXTENSIONS: dict[ImageFormat, frozenset[str]] = {
+    ImageFormat.GEOTIFF: frozenset({"tif", "tiff"}),
+    ImageFormat.PNG: frozenset({"png"}),
+    ImageFormat.JPEG: frozenset({"jpg", "jpeg"}),
+}
+
+
+class ImageStatus(StrEnum):
+    """Processing lifecycle of an uploaded image.
+
+    Currently every transition happens synchronously within the upload request, but the
+    states are recorded regardless — that is what lets a later module move metadata
+    extraction to a background worker without changing anything a client observes.
+    """
+
+    UPLOADED = "uploaded"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
 class TokenType(StrEnum):
     """Discriminator embedded in the JWT ``typ`` claim.
 
@@ -62,6 +100,9 @@ class AuditAction(StrEnum):
     USER_ACTIVATED = "user.activated"
     VERIFICATION_CHANGED = "user.verification.changed"
     ACCESS_DENIED = "authz.access_denied"
+    IMAGE_UPLOADED = "image.uploaded"
+    IMAGE_PROCESSING_FAILED = "image.processing.failed"
+    IMAGE_DELETED = "image.deleted"
 
 
 class AuditOutcome(StrEnum):

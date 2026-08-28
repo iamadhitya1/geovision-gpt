@@ -13,8 +13,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.domain.entities import AuditEvent, TokenPair, User
-from app.domain.enums import AuditAction, AuditOutcome, Role
+from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, TokenPair, User
+from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
 
 T = TypeVar("T")
 
@@ -213,6 +213,90 @@ class AuditEventRead(BaseModel):
             user_agent=event.user_agent,
             detail=event.detail,
             created_at=event.created_at,
+        )
+
+
+class ImageMetadataRead(BaseModel):
+    """Everything extracted from the raster itself. Geospatial fields are ``null`` for a
+    PNG/JPEG, or for a TIFF that carries no embedded CRS — that's a legitimate state, not
+    an error, and the API says so explicitly rather than omitting the fields."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "width_px": 512,
+                "height_px": 512,
+                "band_count": 3,
+                "dtype": "uint8",
+                "crs": "EPSG:4326",
+                "pixel_size_x": 0.0001,
+                "pixel_size_y": 0.0001,
+                "gsd_meters_approx": 11.13,
+                "bounds_native": [72.5, 23.0968, 72.5512, 23.148],
+                "bounds_wgs84": [72.5, 23.0968, 72.5512, 23.148],
+                "cloud_cover_percent": 4.2,
+            }
+        }
+    )
+
+    width_px: int
+    height_px: int
+    band_count: int
+    dtype: str
+    crs: str | None = None
+    pixel_size_x: float | None = None
+    pixel_size_y: float | None = None
+    gsd_meters_approx: float | None = None
+    bounds_native: tuple[float, float, float, float] | None = None
+    bounds_wgs84: tuple[float, float, float, float] | None = None
+    cloud_cover_percent: float | None = None
+
+    @classmethod
+    def from_domain(cls, metadata: ImageMetadata) -> ImageMetadataRead:
+        return cls(
+            width_px=metadata.width_px,
+            height_px=metadata.height_px,
+            band_count=metadata.band_count,
+            dtype=metadata.dtype,
+            crs=metadata.crs,
+            pixel_size_x=metadata.pixel_size_x,
+            pixel_size_y=metadata.pixel_size_y,
+            gsd_meters_approx=metadata.gsd_meters_approx,
+            bounds_native=metadata.bounds_native,
+            bounds_wgs84=metadata.bounds_wgs84,
+            cloud_cover_percent=metadata.cloud_cover_percent,
+        )
+
+
+class ImageRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    original_filename: str
+    image_format: ImageFormat
+    status: ImageStatus
+    file_size_bytes: int
+    checksum_sha256: str
+    metadata: ImageMetadataRead | None = None
+    error_message: str | None = None
+    thumbnail_available: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_domain(cls, image: SatelliteImage) -> ImageRead:
+        return cls(
+            id=image.id,
+            owner_id=image.owner_id,
+            original_filename=image.original_filename,
+            image_format=image.image_format,
+            status=image.status,
+            file_size_bytes=image.file_size_bytes,
+            checksum_sha256=image.checksum_sha256,
+            metadata=ImageMetadataRead.from_domain(image.metadata) if image.metadata else None,
+            error_message=image.error_message,
+            thumbnail_available=image.thumbnail_key is not None,
+            created_at=image.created_at,
+            updated_at=image.updated_at,
         )
 
 

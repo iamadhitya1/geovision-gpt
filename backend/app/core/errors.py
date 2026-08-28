@@ -18,6 +18,7 @@ from app.domain.errors import (
     AuthorizationError,
     ConflictError,
     DomainError,
+    FileTooLargeError,
     NotFoundError,
     RateLimitExceededError,
     ValidationError,
@@ -25,18 +26,22 @@ from app.domain.errors import (
 
 logger = get_logger(__name__)
 
-# Starlette renamed HTTP_422_UNPROCESSABLE_ENTITY to ..._CONTENT and deprecated the old
-# name. Referencing the number directly keeps this module working across both versions
-# without a deprecation warning on every error response.
+# Starlette renamed HTTP_422_UNPROCESSABLE_ENTITY to ..._CONTENT and
+# HTTP_413_REQUEST_ENTITY_TOO_LARGE to ..._CONTENT_TOO_LARGE, deprecating the old names.
+# Referencing the numbers directly keeps this module working across both versions without
+# a deprecation warning on every error response.
+HTTP_413_TOO_LARGE = 413
 HTTP_422_UNPROCESSABLE = 422
 
-# Ordered most-specific first; the first isinstance match wins.
+# Ordered most-specific first; the first isinstance match wins. FileTooLargeError must
+# precede ValidationError (its own parent) or the more specific 413 would never be reached.
 _STATUS_MAP: tuple[tuple[type[DomainError], int], ...] = (
     (RateLimitExceededError, status.HTTP_429_TOO_MANY_REQUESTS),
     (AuthenticationError, status.HTTP_401_UNAUTHORIZED),
     (AuthorizationError, status.HTTP_403_FORBIDDEN),
     (NotFoundError, status.HTTP_404_NOT_FOUND),
     (ConflictError, status.HTTP_409_CONFLICT),
+    (FileTooLargeError, HTTP_413_TOO_LARGE),
     (ValidationError, HTTP_422_UNPROCESSABLE),
 )
 
