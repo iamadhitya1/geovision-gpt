@@ -160,7 +160,7 @@ cd backend && uv run pytest -q
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app
 ```
 
-Current state: **102 tests passing**, ruff clean, mypy `--strict` clean.
+Current state: **103 tests passing**, ruff clean, mypy `--strict` clean.
 
 The suite includes `tests/test_architecture.py`, which parses the AST of every module and
 **fails the build** if `domain/` or `application/` import a framework, or if a router

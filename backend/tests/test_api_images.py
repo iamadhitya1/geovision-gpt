@@ -237,6 +237,32 @@ async def test_researcher_lists_only_their_own_images(client: AsyncClient) -> No
     assert body["items"][0]["original_filename"] == "a.png"
 
 
+async def test_list_filters_by_format_and_status(client: AsyncClient, researcher: User) -> None:
+    headers = await auth_headers(client, researcher.email, USER_PASSWORD)
+    await upload(client, headers, filename="a.png", data=make_png_bytes(), content_type="image/png")
+    await upload(
+        client,
+        headers,
+        filename="b.tif",
+        data=make_geotiff_bytes(),
+        content_type="image/tiff",
+    )
+
+    png_only = await client.get("/images", headers=headers, params={"image_format": "png"})
+    assert png_only.status_code == 200
+    assert png_only.json()["total"] == 1
+    assert all(i["image_format"] == "png" for i in png_only.json()["items"])
+
+    ready_only = await client.get("/images", headers=headers, params={"status": "ready"})
+    assert ready_only.status_code == 200
+    assert ready_only.json()["total"] == 2
+    assert all(i["status"] == "ready" for i in ready_only.json()["items"])
+
+    failed_only = await client.get("/images", headers=headers, params={"status": "failed"})
+    assert failed_only.status_code == 200
+    assert failed_only.json()["total"] == 0
+
+
 async def test_admin_lists_every_image(client: AsyncClient, researcher: User) -> None:
     researcher_headers = await auth_headers(client, researcher.email, USER_PASSWORD)
     await upload(

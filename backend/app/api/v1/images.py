@@ -12,11 +12,35 @@ from app.api.deps import ResearcherUser, get_image_service, get_request_context
 from app.application.dto import ImageRead, MessageResponse, Page, RequestContext
 from app.application.image_service import ImageService
 from app.domain.enums import ImageFormat, ImageStatus
+from app.domain.errors import FileTooLargeError
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
 ImageServiceDep = Annotated[ImageService, Depends(get_image_service)]
 ContextDep = Annotated[RequestContext, Depends(get_request_context)]
+
+_UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MiB
+
+
+async def _read_upload_bounded(file: UploadFile, max_bytes: int) -> bytes:
+    """Read ``file`` in chunks, aborting as soon as ``max_bytes`` is exceeded.
+
+    ``ImageService.upload`` also checks the final size, but that check runs *after* the
+    bytes are already in memory — reading the whole thing first, then rejecting it,
+    defeats the point of having a limit at all. Bounding the read itself means an
+    oversized upload costs at most one chunk beyond the limit, not its full size.
+    """
+    total = 0
+    chunks: list[bytes] = []
+    while chunk := await file.read(_UPLOAD_CHUNK_SIZE):
+        total += len(chunk)
+        if total > max_bytes:
+            raise FileTooLargeError(
+                f"File exceeds the maximum of {max_bytes} bytes.",
+                max_bytes=max_bytes,
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @router.post(
@@ -43,7 +67,7 @@ async def upload_image(
     means the upload itself succeeded but the file couldn't be parsed as a raster, with
     `error_message` explaining why. The file bytes are never discarded either way.
     """
-    data = await file.read()
+    data = await _read_upload_bounded(file, service.max_upload_size_bytes)
     image = await service.upload(
         owner=researcher,
         filename=file.filename or "upload",

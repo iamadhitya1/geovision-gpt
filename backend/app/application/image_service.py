@@ -8,6 +8,7 @@ imaging library directly — only the domain ports. rasterio/Pillow/boto3 live b
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -44,6 +45,14 @@ class ImageService:
         self._uow = uow
         self._max_upload_size_bytes = max_upload_size_bytes
         self._thumbnail_max_size_px = thumbnail_max_size_px
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        """Exposed so the route can bound how much of an oversized request body it reads
+        into memory before rejecting it — see ``read_upload_bounded`` in
+        ``api/v1/images.py``. The check inside :meth:`upload` below stays too, as a
+        defensive backstop for any future caller that hands this service bytes directly."""
+        return self._max_upload_size_bytes
 
     # --- Upload ----------------------------------------------------------------------
 
@@ -114,17 +123,32 @@ class ImageService:
     ) -> None:
         """Extract metadata and generate a thumbnail. Metadata extraction failing marks
         the image FAILED; thumbnail generation failing does not — see
-        :meth:`~app.domain.entities.SatelliteImage.mark_ready`."""
+        :meth:`~app.domain.entities.SatelliteImage.mark_ready`.
+
+        The two extraction calls run concurrently, not one after the other: they read the
+        same immutable ``data``, neither depends on the other's result, and each already
+        runs in its own worker thread (see ``RasterImageAnalyzer``) — running them
+        sequentially would just make every upload wait twice as long as necessary,
+        with nothing gained for the extra wait.
+        """
         image.mark_processing()
         await self._images.update(image)
 
-        try:
-            metadata = await self._analyzer.inspect(data, image.image_format)
-        except Exception as exc:
+        metadata_result, thumbnail_result = await asyncio.gather(
+            self._analyzer.inspect(data, image.image_format),
+            self._analyzer.generate_thumbnail(
+                data, image.image_format, max_size=self._thumbnail_max_size_px
+            ),
+            return_exceptions=True,
+        )
+
+        if isinstance(metadata_result, BaseException):
             # record with a human-readable reason, not a 500 for an upload that already
             # succeeded and whose bytes are already safely stored.
-            logger.warning("image_inspection_failed", image_id=str(image.id), error=str(exc))
-            image.mark_failed(f"Metadata extraction failed: {exc}")
+            logger.warning(
+                "image_inspection_failed", image_id=str(image.id), error=str(metadata_result)
+            )
+            image.mark_failed(f"Metadata extraction failed: {metadata_result}")
             await self._images.update(image)
             await self._audit.record(
                 action=AuditAction.IMAGE_PROCESSING_FAILED,
@@ -132,20 +156,23 @@ class ImageService:
                 user_id=image.owner_id,
                 context=context,
                 image_id=str(image.id),
-                reason=str(exc),
+                reason=str(metadata_result),
             )
             return
 
+        metadata = metadata_result
         thumbnail_key: str | None = None
-        try:
-            thumbnail_bytes = await self._analyzer.generate_thumbnail(
-                data, image.image_format, max_size=self._thumbnail_max_size_px
+        if isinstance(thumbnail_result, BaseException):
+            logger.warning(
+                "thumbnail_generation_failed", image_id=str(image.id), error=str(thumbnail_result)
             )
-            thumbnail_key = self._thumbnail_key(image.owner_id, image.id)
-            await self._storage.put(thumbnail_key, thumbnail_bytes, content_type="image/jpeg")
-        except Exception as exc:
-            logger.warning("thumbnail_generation_failed", image_id=str(image.id), error=str(exc))
-            thumbnail_key = None
+        else:
+            try:
+                thumbnail_key = self._thumbnail_key(image.owner_id, image.id)
+                await self._storage.put(thumbnail_key, thumbnail_result, content_type="image/jpeg")
+            except Exception as exc:  # thumbnailing is best-effort; storing it can still fail
+                logger.warning("thumbnail_storage_failed", image_id=str(image.id), error=str(exc))
+                thumbnail_key = None
 
         image.mark_ready(metadata, thumbnail_key=thumbnail_key)
         await self._images.update(image)
@@ -198,8 +225,16 @@ class ImageService:
         if not self._can_access(image, requesting_user):
             # Unlike get(), a delete attempt on an image the caller can prove exists (they
             # already fetched it, or are probing sequential ids) is worth recording as a
-            # denied action rather than silently returning 404 — see ACCESS_DENIED's use
-            # elsewhere for the same reasoning.
+            # denied action rather than silently returning 404.
+            await self._audit.record(
+                action=AuditAction.ACCESS_DENIED,
+                outcome=AuditOutcome.FAILURE,
+                user_id=requesting_user.id,
+                context=context,
+                image_id=str(image_id),
+                attempted_action="delete_image",
+            )
+            await self._uow.commit()
             raise AuthorizationError("You do not have permission to delete this image.")
 
         await self._storage.delete(image.storage_key)
