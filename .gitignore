@@ -19,7 +19,7 @@ htmlcov/
 # Databases / local state
 *.db
 *.sqlite3
-data/
+/data/
 storage/
 
 # Node / Next.js
@@ -36,7 +36,8 @@ frontend/.env*
 checkpoints/
 runs/
 wandb/
-ml/data/
+ml/data/rsvqa_lr/
+ml/data/__pycache__/
 ml/outputs/
 
 # Geospatial scratch

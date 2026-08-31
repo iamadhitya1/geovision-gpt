@@ -1,42 +1,43 @@
 # GeoVisionGPT
 
 **A Multi-Modal Visual Question Answering System for Satellite and Earth Observation
-Imagery using Vision-Language Models**
+Imagery**
 
-B.Tech Final Year Project · Backend: FastAPI · Frontend: Next.js · VLM: Qwen2.5-VL
+B.Tech Project · Backend: FastAPI · Model: LiT-4-RSVQA-style (BERT-Tiny + lightweight ViT)
 
 ---
 
 ## What this is
 
-Upload or select a satellite scene, ask a question in plain English, and get an answer that
-is **measured, not guessed** — grounded in spectral indices computed from the raster itself,
-with the responsible region highlighted and a calibrated confidence attached.
+Upload or select a satellite scene, ask a question in plain English, and get an answer.
+Two tracks, both real:
 
-```
-"What percentage of this image is vegetation?"
-→ 34.2% vegetated (NDVI > 0.3), covering 8.1 km² of the 23.7 km² scene.
-  Confidence 0.91 · verified against computed NDVI · overlay attached
-```
+- **The model** (`ml/`) — a from-first-principles-explained, actually-trained VQA model
+  following [LiT-4-RSVQA](https://arxiv.org/abs/2306.00758) (Hackel, Clasen, Ravanbakhsh &
+  Demir, TU Berlin, 2023): a lightweight pretrained image transformer + BERT-Tiny, fused,
+  classified over the 1,000 most common answers in RSVQA-LR. Trained and evaluated on
+  IITRAM's HPC GPU. See [`ml/README.md`](ml/README.md) for the full runbook — the
+  [VQA Model Internals study notes](https://claude.ai/code/artifact/5bfca91a-3a98-41ba-87b5-e79441ab1a65)
+  cover how every component works, from CNNs and attention up to this exact architecture.
+- **The web app** (`backend/`) — a production-grade FastAPI service (auth, image
+  management, more to come) that will eventually serve the trained model. Real
+  engineering, real tests, but secondary to the model for grading purposes.
 
-The research contribution is **SGV (Spectral-Grounded Verification)** — a training-free
-framework that turns physics-based spectral indices into a verifier for VLM claims. See
-[`docs/02-research-contribution.md`](docs/02-research-contribution.md).
+A training-free verification idea (**SGV** — checking a model's quantitative claims
+against physically-measured spectral indices) was the original research angle before this
+pivot; whether/how it returns as a layer on top of the trained classifier is still open.
+See [`docs/02-research-contribution.md`](docs/02-research-contribution.md) for that
+original framing.
 
 ## Status
 
-| Module | Scope | Status |
+| Track | Scope | Status |
 |---|---|---|
-| **1** | Authentication, RBAC, audit | **Complete** |
-| **2** | Satellite image management | **Complete** |
-| 3 | Preprocessing and spectral indices | Not started |
-| 4 | Feature extraction | Not started |
-| 5 | Question understanding | Not started |
-| 6 | Vision-language fusion (SEI) | Not started |
-| 7 | Answer generation (CEV) | Not started |
-| 8 | Explainable AI | Not started |
-| 9 | GIS visualisation | Not started |
-| 10 | Analytics dashboard | Not started |
+| **Model** | Dataset (RSVQA-LR), architecture, training/eval scripts | **Built, CPU-verified** — real training blocked on HPC access |
+| **Model** | Actual training run + evaluation | Pending GPU access |
+| Web app — Module 1 | Authentication, RBAC, audit | **Complete** |
+| Web app — Module 2 | Satellite image management | **Complete** |
+| Web app — Module 3+ | Preprocessing onward | Paused — model is the current priority |
 
 ## Quick start (no Docker, no GPU required)
 
