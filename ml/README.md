@@ -14,12 +14,13 @@ every piece works. This README is the practical runbook.
 |---|---|
 | Dataset downloaded, verified, loader tested | **Done** |
 | Model architecture implemented, CPU smoke-tested | **Done** |
-| Training/evaluation scripts written | **Done** |
-| Real training run | **Blocked on IITRAM HPC access** |
+| Training/evaluation scripts written, full pipeline smoke-tested end to end | **Done** |
+| SLURM job scripts written (`ml/slurm/`) | **Done** |
+| HPC access | **Granted** — credentials received |
+| Real training run | **Next step** — see "On GPU day" |
 
-Everything above the blocked line was built and verified without a GPU. The moment HPC
-access lands, only the commands in "On GPU day" below are new — no code should need to
-change.
+Everything above was built and verified without a GPU — the code hasn't changed since,
+only the SLURM scripts and this runbook were added once access actually arrived.
 
 ## Setup
 
@@ -63,25 +64,74 @@ python models/vqa_model.py
 
 ## On GPU day
 
-1. `ssh` (or however IITRAM's HPC access works) in, clone/pull this repo.
-2. `cd ml && uv venv --python 3.11 && uv pip install -e ".[dev]"` — same as above. If the
-   cluster has CUDA available, `torch` will detect it automatically; nothing in this
-   codebase needs to change for that (see `resolve_device()` in `scripts/train.py`).
-3. Confirm: `python -c "import torch; print(torch.cuda.is_available())"` should print `True`.
-4. Real training run:
+IITRAM's CoE-AIML HPC runs everything through **SLURM** — no direct `python train.py` on
+the GPU node, ever (the admin kills it and the job's progress is lost). Access is via the
+college intranet only, master node `192.168.16.5`. Full manual: "Cluster Job Manual for
+HPC.pdf" from the coordinator's email.
+
+**Partition rule** (from the coordinator's email, not the manual): GPU 0 is reserved,
+don't touch it. GPU 1/2 are for jobs needing >20GB. GPU 3 is split into six light slices
+(20/20/10/10/10/10GB) — this model (8.2M params) belongs there, on a 10GB slice.
+
+1. **Log in**: `ssh <username>@192.168.16.5` (Windows: via MobaXterm; Linux: any terminal).
+   Change the emailed password with `passwd` on first login.
+2. **Upload `ml/`**: zip `ml/` (code + `data/rsvqa_lr/` — skip `.venv/` and `checkpoints/`)
+   and upload via MobaXterm's file panel, or `scp`/`rsync` from a terminal that can reach
+   the intranet. Don't try to write this through `nano` — only the `.sbatch` scripts
+   themselves have to be typed/pasted directly on the cluster (see step 4).
+3. **Pre-cache the pretrained weights.** The training script pulls BERT-Tiny
+   (`google/bert_uncased_L-2_H-128_A-2`) and the image encoder's weights from
+   huggingface.co the first time it runs — confirmed by the dev-machine smoke test, which
+   made real HTTP calls to `huggingface.co`. Whether the GPU node has outbound internet
+   from inside the college network is unverified, so don't assume it and get a training
+   job killed by a network timeout after using the one-job slot. Two options:
+   - **Try it live first** — if a job fails with a connection error, fall back to below.
+   - **Safer: pre-cache and go offline.** On this dev machine, the weights are already
+     cached at `~/.cache/huggingface/hub/` (specifically the
+     `models--google--bert_uncased_L-2_H-128_A-2` and
+     `models--timm--xcit_nano_12_p16_224.fb_dist_in1k` folders — ~117MB combined). Zip
+     just those two folders, upload them to the same relative path
+     (`~/.cache/huggingface/hub/...`) on the HPC, and both `smoke.sbatch` and
+     `train.sbatch` already set `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1`, which makes
+     `transformers` and `timm` read the local cache instead of hitting the network.
+4. **Set up the environment** (HPC gives conda, not uv — see the manual §3.2):
    ```bash
-   python scripts/train.py --image-encoder xcit_nano --fusion elementwise --epochs 10 --batch-size 512
+   conda create -n geovision python=3.11 -y
+   conda activate geovision
+   cd ml && pip install -e .
    ```
-   (`xcit_nano` + `elementwise` reproduces the paper's best-performing configuration —
-   64.61% average accuracy on their benchmark. `--batch-size 512` matches the paper; lower
-   it if the GPU's memory can't fit that.)
-5. Evaluate on the held-out test set:
+   Confirm CUDA: `python -c "import torch; print(torch.cuda.is_available())"` → `True`.
+5. **Find the right partition.** Run `sinfo` on the master node and pick a GPU 3 slice —
+   the manual's own examples use `--partition=gpu` as a placeholder name, which won't
+   match this cluster's actual partition names. Don't guess; read `sinfo`'s output.
+6. **Write and submit the smoke job first** — this is the cheap way to catch environment
+   problems (wrong partition, conda env not activating, cache path wrong) before spending
+   the one-job-per-user slot on a real run. `ml/slurm/smoke.sbatch` has the full script;
+   copy its contents into `nano smoke.sbatch` on the cluster (fill in `--partition`), save
+   (`Ctrl+X`, `Y`, `Enter`), then:
+   ```bash
+   sbatch smoke.sbatch
+   squeue -u $USER                    # check it's running, not stuck pending
+   tail -f smoke_<job_id>.log         # watch it live
+   ```
+   Look for `Training complete.` with no errors before moving on.
+7. **Submit the real training job** the same way, from `ml/slurm/train.sbatch`:
+   ```bash
+   sbatch train.sbatch
+   ```
+   This runs `--image-encoder xcit_nano --fusion elementwise --epochs 10 --batch-size 512`
+   — the paper's own best configuration (64.61% average accuracy on their benchmark).
+   Monitor with `squeue -u $USER` / `tail -f train_<job_id>.log`; cancel with
+   `scancel <job_id>` if something's wrong. **Don't resubmit while it's pending** — it
+   starts on its own once resources free up.
+8. **Copy the checkpoint back** before it's cleaned up — `scp` or MobaXterm's file panel —
+   then evaluate on this machine or on the cluster:
    ```bash
    python scripts/evaluate.py --checkpoint checkpoints/xcit_nano_elementwise_epoch9.pt --split test
    ```
-6. **The actual experiment** — repeat step 4 with `--fusion cross_attention`, then compare
-   the two evaluation results. That comparison is the project's own contribution on top of
-   the paper's baseline.
+9. **The actual experiment**: copy `train.sbatch`, change `--fusion` to
+   `cross_attention`, submit, evaluate, and compare the two results. That comparison —
+   not just reproducing the paper — is the project's own contribution.
 
 ## Architecture
 

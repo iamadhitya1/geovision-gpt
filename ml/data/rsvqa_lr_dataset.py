@@ -12,7 +12,7 @@ the file contents directly: it recovers exactly 57,223 / 10,005 / 10,004 active
 question-answer pairs for train/val/test, summing to the documented 77,232 total — so this
 is confirmed correct, not assumed.
 
-Every image file (via ``LR_split_<split>_images.json``) is a 256×256, 3-band, uint8 GeoTIFF
+Every image file (via ``LR_split_<split>_images.json``) is a 256x256, 3-band, uint8 GeoTIFF
 under EPSG:3857, verified directly with rasterio.
 """
 

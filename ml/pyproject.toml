@@ -7,13 +7,13 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     # CPU builds here (dev machine has no GPU); the exact same code runs unmodified on
     # the institute HPC once torch is installed there with CUDA support — device
-    # selection is a single line (see models/device.py), not a rewrite.
+    # selection is a single line (see resolve_device() in scripts/train.py), not a rewrite.
     "torch>=2.4.0",
     "torchvision>=0.19.0",
-    "transformers>=4.44.0",   # BERT-Tiny
-    "sentencepiece>=0.2.0",   # required to build prajjwal1/bert-tiny's tokenizer on this
-                               # transformers version — without it, AutoTokenizer.from_pretrained
-                               # raises ValueError instead of falling back automatically
+    "transformers>=4.44.0",   # BERT-Tiny (google/bert_uncased_L-2_H-128_A-2)
+    "sentencepiece>=0.2.0",   # some tokenizer backends need this even when unused directly —
+                               # without it, AutoTokenizer.from_pretrained can raise ValueError
+                               # instead of falling back automatically
     "timm>=1.0.9",            # DeiT-Tiny / MobileViT-S / XCiT-Nano, pretrained
     "pillow>=11.0.0",
     "numpy>=1.26.0",
