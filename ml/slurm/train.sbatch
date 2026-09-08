@@ -12,6 +12,11 @@
 # copy this file (or just resubmit with --fusion cross_attention edited below) for the
 # project's own experiment — comparing that result against this one is the actual
 # contribution on top of the paper's baseline (see ml/README.md, "On GPU day" step 6).
+#
+# --batch-size 64, not the paper's 512: confirmed via job 4292 that 512 (tuned for a full
+# 80GB A100) hits CUDA out of memory on this cluster's ~9.5GB usable 1g.10gb MIG slice.
+# 64 is untested-but-conservative; if it fits with room to spare, this can go higher —
+# check nvidia-smi's memory usage during the run.
 
 #SBATCH --job-name=gvg_train
 #SBATCH --output=train_%j.log
@@ -45,6 +50,6 @@ cd "$SLURM_SUBMIT_DIR"
     --image-encoder xcit_nano \
     --fusion elementwise \
     --epochs 10 \
-    --batch-size 512
+    --batch-size 64
 
 echo "Job finished on: $(date)"
