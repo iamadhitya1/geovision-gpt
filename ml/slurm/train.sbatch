@@ -27,7 +27,14 @@
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job started on: $(date)"
 echo "Node: $(hostname)"
-echo "Allocated GPUs: $CUDA_VISIBLE_DEVICES"
+echo "Allocated GPUs (raw Slurm index): $CUDA_VISIBLE_DEVICES"
+
+# MIG quirk, confirmed 2026-09-08 — see smoke.sbatch's comment for the full explanation.
+MIG_UUID=$(nvidia-smi -L | grep -E "Device[[:space:]]*${CUDA_VISIBLE_DEVICES}:" | grep -oE 'MIG-[0-9a-f-]+')
+if [ -n "$MIG_UUID" ]; then
+    export CUDA_VISIBLE_DEVICES="$MIG_UUID"
+fi
+echo "Resolved CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1

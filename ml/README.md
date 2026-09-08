@@ -80,27 +80,27 @@ turned out to be the real one, not a placeholder). Its `Gres` string is
 slice** — `--gres=gpu:1g.10gb:1` — which both `smoke.sbatch` and `train.sbatch` already
 use.
 
+**MIG addressing quirk, also confirmed 2026-09-08 (jobs 4288-4290):** Slurm hands the job
+a bare MIG device index in `$CUDA_VISIBLE_DEVICES` (e.g. `5`), but CUDA needs that index's
+actual UUID (e.g. `MIG-0790625e-...`, from `nvidia-smi -L`) to see the device at all — the
+bare index alone left `torch.cuda.is_available()` silently `False`, no error. Both scripts
+now resolve the correct UUID from `nvidia-smi -L` at runtime before launching Python.
+Separately, the cluster's driver only supports up to CUDA 12.4 — the default `pip install
+torch` pulled a newer-CUDA build that silently fell back to CPU; fixed by installing with
+`pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124`.
+
 1. **Log in**: `ssh <username>@192.168.16.5` (Windows: via MobaXterm; Linux: any terminal).
    Change the emailed password with `passwd` on first login.
 2. **Upload `ml/`**: zip `ml/` (code + `data/rsvqa_lr/` — skip `.venv/` and `checkpoints/`)
    and upload via MobaXterm's file panel, or `scp`/`rsync` from a terminal that can reach
    the intranet. Don't try to write this through `nano` — only the `.sbatch` scripts
    themselves have to be typed/pasted directly on the cluster (see step 4).
-3. **Pre-cache the pretrained weights.** The training script pulls BERT-Tiny
-   (`google/bert_uncased_L-2_H-128_A-2`) and the image encoder's weights from
-   huggingface.co the first time it runs — confirmed by the dev-machine smoke test, which
-   made real HTTP calls to `huggingface.co`. Whether the GPU node has outbound internet
-   from inside the college network is unverified, so don't assume it and get a training
-   job killed by a network timeout after using the one-job slot. Two options:
-   - **Try it live first** — if a job fails with a connection error, fall back to below.
-   - **Safer: pre-cache and go offline.** On this dev machine, the weights are already
-     cached at `~/.cache/huggingface/hub/` (specifically the
-     `models--google--bert_uncased_L-2_H-128_A-2` and
-     `models--timm--xcit_nano_12_p16_224.fb_dist_in1k` folders — ~117MB combined). Zip
-     just those two folders, upload them to the same relative path
-     (`~/.cache/huggingface/hub/...`) on the HPC, and both `smoke.sbatch` and
-     `train.sbatch` already set `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1`, which makes
-     `transformers` and `timm` read the local cache instead of hitting the network.
+3. **Pretrained weights: confirmed working, no pre-caching needed.** The training script
+   pulls BERT-Tiny and the image encoder's weights from huggingface.co on first run.
+   **Confirmed 2026-09-08 on a real job (4289/4290): the GPU node has outbound internet**
+   — the download succeeded live, even with `HF_HUB_OFFLINE=1` set in the script (that env
+   var is left in as a no-op safety net; it didn't block the live calls this
+   `huggingface_hub`/`transformers` version made anyway). No action needed here.
 4. **Set up the environment** (HPC gives conda, not uv — see the manual §3.2). Conda isn't
    on PATH by default; load the module first, then (one-time only) `conda init` + reopen
    the shell before `conda activate` works interactively:

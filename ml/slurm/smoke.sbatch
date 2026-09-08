@@ -29,7 +29,17 @@
 
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $(hostname)"
-echo "Allocated GPUs: $CUDA_VISIBLE_DEVICES"
+echo "Allocated GPUs (raw Slurm index): $CUDA_VISIBLE_DEVICES"
+
+# MIG quirk, confirmed 2026-09-08: Slurm hands CUDA_VISIBLE_DEVICES as a bare MIG device
+# index (e.g. "5"), but CUDA needs the MIG UUID for that index to actually see the device
+# — a bare index alone left torch.cuda.is_available() False with no error message. Resolve
+# it here at runtime so this works regardless of which MIG slice gets allocated.
+MIG_UUID=$(nvidia-smi -L | grep -E "Device[[:space:]]*${CUDA_VISIBLE_DEVICES}:" | grep -oE 'MIG-[0-9a-f-]+')
+if [ -n "$MIG_UUID" ]; then
+    export CUDA_VISIBLE_DEVICES="$MIG_UUID"
+fi
+echo "Resolved CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
 
 # If the HF weights cache was uploaded (see ml/README.md "On GPU day"), this keeps the job
 # from depending on the GPU node having outbound internet — the loader reads the local
