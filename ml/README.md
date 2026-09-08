@@ -111,10 +111,19 @@ use.
    conda activate geovision
    cd ~/geovision-gpt-ml && pip install -e .
    ```
-   Confirm CUDA: `python -c "import torch; print(torch.cuda.is_available())"` → `True`.
-   Confirmed real conda path on this cluster: `/apps/codes/anaconda3/etc/profile.d/conda.sh`
-   — already baked into both `.sbatch` scripts (batch jobs need `module load anaconda3` +
-   this `source` line explicitly, since they don't inherit an interactive shell's init).
+   Confirm CUDA: `python -c "import torch; print(torch.cuda.is_available())"` — prints
+   `False` here, correctly: the master node has no GPU, only `gpunode` does, only reachable
+   through a submitted job. Don't treat `False` here as an error.
+
+   Note where the env actually lives — `conda create -n geovision` fails to write under
+   the shared `/apps/codes/anaconda3/envs/` (no permission), so conda silently falls back
+   to `~/.conda/envs/geovision` instead. Confirm with `conda env list`. This matters for
+   the next step: `conda activate` inside a non-interactive `sbatch` script is fragile
+   (confirmed the hard way — a job failed with `ModuleNotFoundError: No module named
+   'torch'` despite installing correctly interactively) even with `module load` +
+   `source conda.sh` added. Both `.sbatch` scripts now call
+   `~/.conda/envs/geovision/bin/python` directly instead of activating anything — more
+   robust than relying on shell-init ordering inside a batch job.
 5. **Write and submit the smoke job first** — this is the cheap way to catch environment
    problems (conda env not activating, cache path wrong) before spending the
    one-job-per-user slot on a real run. `ml/slurm/smoke.sbatch` has the full script,
