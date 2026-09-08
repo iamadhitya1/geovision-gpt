@@ -5,7 +5,8 @@
 # resources free up.
 #
 # Written directly on the cluster with `nano train.sbatch` (see smoke.sbatch's header for
-# why). Fill in --partition the same way — a GPU 3 light slice, never GPU 0.
+# the confirmed --gres/--partition values and why a named 1g.10gb slice is required to
+# guarantee GPU 3 and never GPU 0 on this cluster).
 #
 # --fusion elementwise reproduces the paper's own best configuration. Once this finishes,
 # copy this file (or just resubmit with --fusion cross_attention edited below) for the
@@ -18,10 +19,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:1g.10gb:1
 #SBATCH --mem=16G
 #SBATCH --time=04:00:00
-#SBATCH --partition=REPLACE_WITH_GPU3_LIGHT_PARTITION
+#SBATCH --partition=gpu
 
 echo "Job ID: $SLURM_JOB_ID"
 echo "Job started on: $(date)"

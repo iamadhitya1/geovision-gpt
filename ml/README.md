@@ -69,9 +69,16 @@ the GPU node, ever (the admin kills it and the job's progress is lost). Access i
 college intranet only, master node `192.168.16.5`. Full manual: "Cluster Job Manual for
 HPC.pdf" from the coordinator's email.
 
-**Partition rule** (from the coordinator's email, not the manual): GPU 0 is reserved,
-don't touch it. GPU 1/2 are for jobs needing >20GB. GPU 3 is split into six light slices
-(20/20/10/10/10/10GB) — this model (8.2M params) belongs there, on a 10GB slice.
+**Confirmed 2026-09-08** via `sinfo` + `scontrol show node gpunode` on a real login: this
+cluster has exactly **one** Slurm partition, named `gpu` (the manual's own example name
+turned out to be the real one, not a placeholder). Its `Gres` string is
+`gpu:ampere:3,gpu:1g.20gb:2,gpu:1g.10gb:4` — three full GPUs tagged generically `ampere`
+(GPU 0/1/2 from the coordinator's email; Slurm can't tell them apart by name, so a bare
+`--gres=gpu:1` risks landing on reserved GPU 0) plus GPU 3's six MIG slices, two
+`1g.20gb` and four `1g.10gb`, matching the email's 20/20/10/10/10/10GB split exactly.
+**The only way to guarantee GPU 3's small tier and never GPU 0 is to request a named
+slice** — `--gres=gpu:1g.10gb:1` — which both `smoke.sbatch` and `train.sbatch` already
+use.
 
 1. **Log in**: `ssh <username>@192.168.16.5` (Windows: via MobaXterm; Linux: any terminal).
    Change the emailed password with `passwd` on first login.
@@ -101,21 +108,18 @@ don't touch it. GPU 1/2 are for jobs needing >20GB. GPU 3 is split into six ligh
    cd ml && pip install -e .
    ```
    Confirm CUDA: `python -c "import torch; print(torch.cuda.is_available())"` → `True`.
-5. **Find the right partition.** Run `sinfo` on the master node and pick a GPU 3 slice —
-   the manual's own examples use `--partition=gpu` as a placeholder name, which won't
-   match this cluster's actual partition names. Don't guess; read `sinfo`'s output.
-6. **Write and submit the smoke job first** — this is the cheap way to catch environment
-   problems (wrong partition, conda env not activating, cache path wrong) before spending
-   the one-job-per-user slot on a real run. `ml/slurm/smoke.sbatch` has the full script;
-   copy its contents into `nano smoke.sbatch` on the cluster (fill in `--partition`), save
-   (`Ctrl+X`, `Y`, `Enter`), then:
+5. **Write and submit the smoke job first** — this is the cheap way to catch environment
+   problems (conda env not activating, cache path wrong) before spending the
+   one-job-per-user slot on a real run. `ml/slurm/smoke.sbatch` has the full script,
+   `--partition=gpu` and `--gres=gpu:1g.10gb:1` already filled in (see above); copy its
+   contents into `nano smoke.sbatch` on the cluster, save (`Ctrl+X`, `Y`, `Enter`), then:
    ```bash
    sbatch smoke.sbatch
    squeue -u $USER                    # check it's running, not stuck pending
    tail -f smoke_<job_id>.log         # watch it live
    ```
    Look for `Training complete.` with no errors before moving on.
-7. **Submit the real training job** the same way, from `ml/slurm/train.sbatch`:
+6. **Submit the real training job** the same way, from `ml/slurm/train.sbatch`:
    ```bash
    sbatch train.sbatch
    ```
@@ -124,12 +128,12 @@ don't touch it. GPU 1/2 are for jobs needing >20GB. GPU 3 is split into six ligh
    Monitor with `squeue -u $USER` / `tail -f train_<job_id>.log`; cancel with
    `scancel <job_id>` if something's wrong. **Don't resubmit while it's pending** — it
    starts on its own once resources free up.
-8. **Copy the checkpoint back** before it's cleaned up — `scp` or MobaXterm's file panel —
+7. **Copy the checkpoint back** before it's cleaned up — `scp` or MobaXterm's file panel —
    then evaluate on this machine or on the cluster:
    ```bash
    python scripts/evaluate.py --checkpoint checkpoints/xcit_nano_elementwise_epoch9.pt --split test
    ```
-9. **The actual experiment**: copy `train.sbatch`, change `--fusion` to
+8. **The actual experiment**: copy `train.sbatch`, change `--fusion` to
    `cross_attention`, submit, evaluate, and compare the two results. That comparison —
    not just reproducing the paper — is the project's own contribution.
 

@@ -9,9 +9,12 @@
 # must be typed/pasted into the cluster's own editor, not uploaded as a file. The rest of
 # ml/ (code, dataset, HF cache) uploads fine as a zip via MobaXterm or scp/rsync.
 #
-# Before submitting, fill in --partition below — run `sinfo` on the master node first and
-# pick one of GPU 3's small (10GB) slices. Never GPU 0 (reserved) or GPU 1/2 (for jobs
-# needing >20GB — this model doesn't).
+# Confirmed via `sinfo` + `scontrol show node gpunode` on 2026-09-08: this cluster has a
+# single Slurm partition ("gpu") covering one node with Gres=gpu:ampere:3 (GPU 0/1/2 — full
+# GPUs, indistinguishable by name, so a generic request risks landing on reserved GPU 0),
+# gpu:1g.20gb:2 and gpu:1g.10gb:4 (GPU 3's six MIG slices, matching the coordinator's email
+# exactly). Requesting a named 1g.10gb slice is the only way to guarantee GPU 3's small
+# tier and never GPU 0 — a generic `--gres=gpu:1` cannot make that guarantee here.
 
 #SBATCH --job-name=gvg_smoke
 #SBATCH --output=smoke_%j.log
@@ -19,10 +22,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=2
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:1g.10gb:1
 #SBATCH --mem=8G
 #SBATCH --time=00:15:00
-#SBATCH --partition=REPLACE_WITH_GPU3_LIGHT_PARTITION
+#SBATCH --partition=gpu
 
 echo "Job ID: $SLURM_JOB_ID"
 echo "Node: $(hostname)"
