@@ -39,7 +39,8 @@ echo "Allocated GPUs: $CUDA_VISIBLE_DEVICES"
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
-source ~/miniconda3/etc/profile.d/conda.sh   # adjust if using module-load anaconda3 instead
+module load anaconda3
+source /apps/codes/anaconda3/etc/profile.d/conda.sh
 conda activate geovision
 
 cd "$SLURM_SUBMIT_DIR"   # run sbatch from inside ml/ so this lands in the right place

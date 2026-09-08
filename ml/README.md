@@ -101,13 +101,20 @@ use.
      (`~/.cache/huggingface/hub/...`) on the HPC, and both `smoke.sbatch` and
      `train.sbatch` already set `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1`, which makes
      `transformers` and `timm` read the local cache instead of hitting the network.
-4. **Set up the environment** (HPC gives conda, not uv — see the manual §3.2):
+4. **Set up the environment** (HPC gives conda, not uv — see the manual §3.2). Conda isn't
+   on PATH by default; load the module first, then (one-time only) `conda init` + reopen
+   the shell before `conda activate` works interactively:
    ```bash
+   module load anaconda3
    conda create -n geovision python=3.11 -y
+   conda init && source ~/.bashrc      # one-time; skip on later logins
    conda activate geovision
-   cd ml && pip install -e .
+   cd ~/geovision-gpt-ml && pip install -e .
    ```
    Confirm CUDA: `python -c "import torch; print(torch.cuda.is_available())"` → `True`.
+   Confirmed real conda path on this cluster: `/apps/codes/anaconda3/etc/profile.d/conda.sh`
+   — already baked into both `.sbatch` scripts (batch jobs need `module load anaconda3` +
+   this `source` line explicitly, since they don't inherit an interactive shell's init).
 5. **Write and submit the smoke job first** — this is the cheap way to catch environment
    problems (conda env not activating, cache path wrong) before spending the
    one-job-per-user slot on a real run. `ml/slurm/smoke.sbatch` has the full script,
