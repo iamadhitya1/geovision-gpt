@@ -13,8 +13,16 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, TokenClaims, User
-from app.domain.enums import ImageFormat, ImageStatus, Role, TokenType
+from app.domain.entities import (
+    AuditEvent,
+    ImageMetadata,
+    SatelliteImage,
+    TokenClaims,
+    User,
+    VqaAnswer,
+    VqaQuery,
+)
+from app.domain.enums import FusionType, ImageFormat, ImageStatus, Role, TokenType
 
 
 @runtime_checkable
@@ -87,6 +95,19 @@ class ImageRepository(Protocol):
 
 
 @runtime_checkable
+class VqaQueryRepository(Protocol):
+    """Persistence port for :class:`~app.domain.entities.VqaQuery`."""
+
+    async def add(self, query: VqaQuery) -> VqaQuery: ...
+
+    async def get_by_id(self, query_id: UUID) -> VqaQuery | None: ...
+
+    async def list_for_image(
+        self, image_id: UUID, *, offset: int = 0, limit: int = 50
+    ) -> tuple[list[VqaQuery], int]: ...
+
+
+@runtime_checkable
 class ObjectStorage(Protocol):
     """Binary object storage port. Filesystem in the local-lite profile, MinIO/S3 beyond it.
 
@@ -129,6 +150,29 @@ class ImageAnalyzer(Protocol):
     ) -> bytes:
         """Return JPEG-encoded thumbnail bytes, longest edge at most ``max_size`` px."""
         ...
+
+
+@runtime_checkable
+class VqaModelPort(Protocol):
+    """Inference port over the trained VQA model(s) — the only place ``torch``,
+    ``transformers``, and ``timm`` are allowed to be imported outside
+    ``infrastructure/vqa/``, mirroring how :class:`ImageAnalyzer` owns ``rasterio``.
+
+    A concrete implementation may hold more than one trained checkpoint in memory at once
+    (the elementwise baseline and the cross-attention experiment) — :meth:`available_fusions`
+    reports which are actually loaded, since a checkpoint that hasn't been copied down from
+    the HPC cluster yet is a legitimate, expected state during development, not an error.
+    """
+
+    async def predict(
+        self, image_data: bytes, question: str, *, fusion: FusionType, top_k: int = 3
+    ) -> VqaAnswer:
+        """Raises :class:`~app.domain.errors.ModelUnavailableError` if ``fusion`` isn't
+        loaded, and :class:`~app.domain.errors.CorruptImageError` if ``image_data`` can't
+        be decoded as an image."""
+        ...
+
+    def available_fusions(self) -> frozenset[FusionType]: ...
 
 
 @runtime_checkable

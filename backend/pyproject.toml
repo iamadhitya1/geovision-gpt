@@ -23,7 +23,15 @@ dependencies = [
     "rasterio>=1.4.0",
     "pillow>=11.0.0",
     "boto3>=1.35.0",
+    # The trained VQA model itself — torch/transformers/timm come in transitively via
+    # this package's own dependencies (see ml/pyproject.toml), so training and serving
+    # can never silently drift onto two different architectures. Resolved to ../ml via
+    # [tool.uv.sources] below, uv's supported mechanism for a local path dependency.
+    "geovisiongpt-model",
 ]
+
+[tool.uv.sources]
+geovisiongpt-model = { path = "../ml" }
 
 [project.optional-dependencies]
 dev = [
@@ -41,6 +49,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+# Required for the "geovisiongpt-model @ file:../ml" dependency above — hatchling refuses
+# a direct path/URL reference otherwise. Safe here: it's this project's own sibling
+# package, not an untrusted third party.
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -71,4 +85,10 @@ disallow_untyped_defs = false
 # kept small and reviewed by hand instead of leaning on static checking there.
 [[tool.mypy.overrides]]
 module = ["rasterio.*"]
+ignore_missing_imports = true
+
+# Same reasoning for torch/transformers/timm and the ml/ package itself, which has no
+# strict-mypy setup of its own (it's a training codebase, not this project's API surface).
+[[tool.mypy.overrides]]
+module = ["torch.*", "transformers.*", "timm.*", "models.*", "dataset.*", "PIL.*"]
 ignore_missing_imports = true

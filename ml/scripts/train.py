@@ -26,7 +26,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data.rsvqa_lr_dataset import AnswerVocabulary, RSVQALowResDataset
+from dataset.rsvqa_lr_dataset import AnswerVocabulary, RSVQALowResDataset
 from models.vqa_model import (
     ImageEncoderName,
     LitRSVQAModel,
@@ -38,7 +38,7 @@ from models.vqa_model import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
 logger = logging.getLogger(__name__)
 
-DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "rsvqa_lr"
+DATA_ROOT = Path(__file__).resolve().parent.parent / "dataset" / "rsvqa_lr"
 VOCAB_PATH = DATA_ROOT / "answer_vocab.json"
 CHECKPOINT_DIR = Path(__file__).resolve().parent.parent / "checkpoints"
 

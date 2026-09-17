@@ -106,6 +106,22 @@ class CorruptImageError(ValidationError):
     )
 
 
+class ImageNotReadyError(ValidationError):
+    code = "image_not_ready"
+    message = (
+        "This image hasn't finished processing yet, or processing failed. "
+        "Only images with status 'ready' can be queried."
+    )
+
+
+class ModelUnavailableError(DomainError):
+    code = "model_unavailable"
+    message = (
+        "The requested model variant isn't loaded on this server. This is expected if its "
+        "trained checkpoint hasn't been deployed yet."
+    )
+
+
 class RateLimitExceededError(DomainError):
     code = "rate_limit_exceeded"
     message = "Too many requests. Please try again later."

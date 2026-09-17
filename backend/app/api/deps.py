@@ -30,6 +30,7 @@ from app.application.dto import RequestContext
 from app.application.image_service import ImageService
 from app.application.password_policy import PasswordPolicy
 from app.application.user_service import UserService
+from app.application.vqa_service import VqaService
 from app.core.config import Settings
 from app.core.logging import user_id_ctx
 from app.domain.entities import User
@@ -46,12 +47,15 @@ from app.domain.interfaces import (
     TokenService,
     UnitOfWork,
     UserRepository,
+    VqaModelPort,
+    VqaQueryRepository,
 )
 from app.infrastructure.cache.rate_limiter import FixedWindowRateLimiter, NullRateLimiter
 from app.infrastructure.db.repositories import (
     SqlAlchemyAuditRepository,
     SqlAlchemyImageRepository,
     SqlAlchemyUserRepository,
+    SqlAlchemyVqaQueryRepository,
 )
 from app.infrastructure.db.session import SqlAlchemyUnitOfWork
 
@@ -87,6 +91,10 @@ def get_storage(request: Request) -> ObjectStorage:
 
 def get_image_analyzer(request: Request) -> ImageAnalyzer:
     return request.app.state.image_analyzer  # type: ignore[no-any-return]
+
+
+def get_vqa_model(request: Request) -> VqaModelPort:
+    return request.app.state.vqa_model  # type: ignore[no-any-return]
 
 
 def get_rate_limiter(
@@ -132,6 +140,10 @@ def get_audit_repository(session: SessionDep) -> AuditRepository:
 
 def get_image_repository(session: SessionDep) -> ImageRepository:
     return SqlAlchemyImageRepository(session)
+
+
+def get_vqa_query_repository(session: SessionDep) -> VqaQueryRepository:
+    return SqlAlchemyVqaQueryRepository(session)
 
 
 def get_unit_of_work(session: SessionDep) -> UnitOfWork:
@@ -190,6 +202,26 @@ def get_image_service(
         uow=uow,
         max_upload_size_bytes=settings.max_upload_size_bytes,
         thumbnail_max_size_px=settings.thumbnail_max_size_px,
+    )
+
+
+def get_vqa_service(
+    images: Annotated[ImageRepository, Depends(get_image_repository)],
+    storage: Annotated[ObjectStorage, Depends(get_storage)],
+    model: Annotated[VqaModelPort, Depends(get_vqa_model)],
+    queries: Annotated[VqaQueryRepository, Depends(get_vqa_query_repository)],
+    audit: Annotated[AuditService, Depends(get_audit_service)],
+    uow: Annotated[UnitOfWork, Depends(get_unit_of_work)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> VqaService:
+    return VqaService(
+        images=images,
+        storage=storage,
+        model=model,
+        queries=queries,
+        audit=audit,
+        uow=uow,
+        default_top_k=settings.vqa_top_k_alternatives,
     )
 
 

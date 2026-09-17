@@ -1,0 +1,145 @@
+"""Visual question answering use cases.
+
+Like every other service in this project, this imports no ML framework directly — only
+the domain :class:`~app.domain.interfaces.VqaModelPort` port. ``torch``/``transformers``/
+``timm`` live behind ``infrastructure/vqa/``, the same separation
+:class:`~app.application.image_service.ImageService` keeps around ``rasterio``.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from uuid import UUID
+
+from app.application.audit_service import AuditService
+from app.application.dto import RequestContext
+from app.core.logging import get_logger
+from app.domain.entities import SatelliteImage, User, VqaAnswer, VqaQuery
+from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageStatus
+from app.domain.errors import ImageNotReadyError, NotFoundError
+from app.domain.interfaces import (
+    ImageRepository,
+    ObjectStorage,
+    UnitOfWork,
+    VqaModelPort,
+    VqaQueryRepository,
+)
+
+logger = get_logger(__name__)
+
+
+class VqaService:
+    """Answer a question about an already-uploaded, already-processed satellite image."""
+
+    def __init__(
+        self,
+        *,
+        images: ImageRepository,
+        storage: ObjectStorage,
+        model: VqaModelPort,
+        queries: VqaQueryRepository,
+        audit: AuditService,
+        uow: UnitOfWork,
+        default_top_k: int,
+    ) -> None:
+        self._images = images
+        self._storage = storage
+        self._model = model
+        self._queries = queries
+        self._audit = audit
+        self._uow = uow
+        self._default_top_k = default_top_k
+
+    def available_fusions(self) -> frozenset[FusionType]:
+        return self._model.available_fusions()
+
+    async def ask(
+        self,
+        *,
+        image_id: UUID,
+        question: str,
+        requesting_user: User,
+        fusions: list[FusionType] | None = None,
+        context: RequestContext | None = None,
+    ) -> VqaQuery:
+        """Run ``question`` through every requested (or every loaded) model variant and
+        persist the result as one :class:`~app.domain.entities.VqaQuery`.
+
+        A partial failure — one fusion variant erroring while another succeeds — still
+        returns the answers that did succeed rather than discarding the whole request;
+        this matters specifically because the two variants are meant to be compared, and a
+        transient failure on one side shouldn't hide a working result on the other.
+        """
+        image = await self._images.get_by_id(image_id)
+        if image is None or not self._can_access(image, requesting_user):
+            raise NotFoundError("Image not found.", image_id=str(image_id))
+        if image.status is not ImageStatus.READY:
+            raise ImageNotReadyError(image_id=str(image_id), status=image.status.value)
+
+        requested = frozenset(fusions) if fusions else self._model.available_fusions()
+        image_bytes = await self._storage.get(image.storage_key)
+
+        results = await asyncio.gather(
+            *(
+                self._model.predict(
+                    image_bytes, question, fusion=fusion, top_k=self._default_top_k
+                )
+                for fusion in requested
+            ),
+            return_exceptions=True,
+        )
+
+        answers: list[VqaAnswer] = []
+        failures: list[str] = []
+        for fusion, result in zip(requested, results, strict=True):
+            if isinstance(result, BaseException):
+                logger.warning(
+                    "vqa_prediction_failed",
+                    image_id=str(image_id),
+                    fusion=fusion.value,
+                    error=str(result),
+                )
+                failures.append(fusion.value)
+            else:
+                answers.append(result)
+
+        query = VqaQuery(
+            image_id=image_id,
+            asked_by=requesting_user.id,
+            question=question,
+            answers=tuple(answers),
+        )
+        query = await self._queries.add(query)
+
+        await self._audit.record(
+            action=AuditAction.VQA_QUERY_ANSWERED if answers else AuditAction.VQA_QUERY_FAILED,
+            outcome=AuditOutcome.SUCCESS if answers else AuditOutcome.FAILURE,
+            user_id=requesting_user.id,
+            context=context,
+            image_id=str(image_id),
+            query_id=str(query.id),
+            fusions_answered=[a.fusion.value for a in answers],
+            fusions_failed=failures,
+        )
+        await self._uow.commit()
+
+        logger.info(
+            "vqa_query_answered",
+            image_id=str(image_id),
+            query_id=str(query.id),
+            fusions_answered=len(answers),
+            fusions_failed=len(failures),
+        )
+        return query
+
+    async def list_for_image(
+        self, image_id: UUID, requesting_user: User, *, offset: int = 0, limit: int = 50
+    ) -> tuple[list[VqaQuery], int]:
+        image = await self._images.get_by_id(image_id)
+        if image is None or not self._can_access(image, requesting_user):
+            raise NotFoundError("Image not found.", image_id=str(image_id))
+        return await self._queries.list_for_image(image_id, offset=offset, limit=limit)
+
+    @staticmethod
+    def _can_access(image: SatelliteImage, user: User) -> bool:
+        return user.is_admin or image.is_owned_by(user.id)

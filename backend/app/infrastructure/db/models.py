@@ -11,11 +11,26 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, Integer, String, Uuid, func
+from sqlalchemy import JSON, BigInteger, Boolean, ForeignKey, Index, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, User
-from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
+from app.domain.entities import (
+    AnswerAlternative,
+    AuditEvent,
+    ImageMetadata,
+    SatelliteImage,
+    User,
+    VqaAnswer,
+    VqaQuery,
+)
+from app.domain.enums import (
+    AuditAction,
+    AuditOutcome,
+    FusionType,
+    ImageFormat,
+    ImageStatus,
+    Role,
+)
 from app.infrastructure.db.base import Base, ensure_utc
 
 
@@ -105,6 +120,32 @@ class ImageModel(Base):
 
     # Supports the dominant listing query: "this owner's images, newest first".
     __table_args__ = (Index("ix_images_owner_created", "owner_id", "created_at"),)
+
+
+class VqaQueryModel(Base):
+    __tablename__ = "vqa_queries"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    image_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("images.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asked_by: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    question: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Every fusion variant's answer to this one question, stored together rather than as
+    # child rows — see VqaQuery's own docstring: the comparison is the point, so the two
+    # (or however many) answers are one fact, not rows that could drift out of sync.
+    answers_json: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), nullable=False, index=True
+    )
+
+    # Supports the dominant listing query: "this image's questions, newest first".
+    __table_args__ = (Index("ix_vqa_queries_image_created", "image_id", "created_at"),)
 
 
 # --- Mappers -----------------------------------------------------------------
@@ -277,3 +318,50 @@ def apply_image_changes(model: ImageModel, entity: SatelliteImage) -> ImageModel
     model.metadata_json = _metadata_to_json(entity.metadata)
     model.error_message = entity.error_message
     return model
+
+
+def _answer_to_json(answer: VqaAnswer) -> dict[str, Any]:
+    return {
+        "fusion": answer.fusion.value,
+        "answer": answer.answer,
+        "confidence": answer.confidence,
+        "alternatives": [
+            {"answer": alt.answer, "confidence": alt.confidence} for alt in answer.alternatives
+        ],
+    }
+
+
+def _answer_from_json(data: dict[str, Any]) -> VqaAnswer:
+    return VqaAnswer(
+        fusion=FusionType(data["fusion"]),
+        answer=data["answer"],
+        confidence=data["confidence"],
+        alternatives=tuple(
+            AnswerAlternative(answer=alt["answer"], confidence=alt["confidence"])
+            for alt in data["alternatives"]
+        ),
+    )
+
+
+def vqa_query_to_domain(model: VqaQueryModel) -> VqaQuery:
+    created = ensure_utc(model.created_at)
+    assert created is not None  # NOT NULL column
+    return VqaQuery(
+        id=model.id,
+        image_id=model.image_id,
+        asked_by=model.asked_by,
+        question=model.question,
+        answers=tuple(_answer_from_json(a) for a in model.answers_json),
+        created_at=created,
+    )
+
+
+def vqa_query_to_model(entity: VqaQuery) -> VqaQueryModel:
+    return VqaQueryModel(
+        id=entity.id,
+        image_id=entity.image_id,
+        asked_by=entity.asked_by,
+        question=entity.question,
+        answers_json=[_answer_to_json(a) for a in entity.answers],
+        created_at=entity.created_at,
+    )

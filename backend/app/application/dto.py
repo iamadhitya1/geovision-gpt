@@ -13,8 +13,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.domain.entities import AuditEvent, ImageMetadata, SatelliteImage, TokenPair, User
-from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
+from app.domain.entities import (
+    AnswerAlternative,
+    AuditEvent,
+    ImageMetadata,
+    SatelliteImage,
+    TokenPair,
+    User,
+    VqaAnswer,
+    VqaQuery,
+)
+from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageFormat, ImageStatus, Role
 
 T = TypeVar("T")
 
@@ -114,6 +123,26 @@ class AdminUpdateUserRequest(BaseModel):
     role: Role | None = None
     is_active: bool | None = None
     is_verified: bool | None = None
+
+
+class AskQuestionRequest(BaseModel):
+    """``fusions``, not ``fusion``: this project's whole original contribution is the
+    baseline-vs-cross-attention comparison, so the default is to answer with every model
+    variant that's actually loaded, not just one. A client that only wants one still can,
+    by passing a single-item list."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "question": "Is this a rural or an urban area?",
+                "fusions": ["elementwise", "cross_attention"],
+            }
+        },
+    )
+
+    question: Annotated[str, Field(min_length=1, max_length=500)]
+    fusions: list[FusionType] | None = None  # None means "every fusion currently loaded"
 
 
 # --- Responses ---------------------------------------------------------------
@@ -297,6 +326,80 @@ class ImageRead(BaseModel):
             thumbnail_available=image.thumbnail_key is not None,
             created_at=image.created_at,
             updated_at=image.updated_at,
+        )
+
+
+class AnswerAlternativeRead(BaseModel):
+    answer: str
+    confidence: float
+
+    @classmethod
+    def from_domain(cls, alternative: AnswerAlternative) -> AnswerAlternativeRead:
+        return cls(answer=alternative.answer, confidence=alternative.confidence)
+
+
+class VqaAnswerRead(BaseModel):
+    fusion: FusionType
+    answer: str
+    confidence: float
+    alternatives: list[AnswerAlternativeRead]
+
+    @classmethod
+    def from_domain(cls, answer: VqaAnswer) -> VqaAnswerRead:
+        return cls(
+            fusion=answer.fusion,
+            answer=answer.answer,
+            confidence=answer.confidence,
+            alternatives=[AnswerAlternativeRead.from_domain(a) for a in answer.alternatives],
+        )
+
+
+class VqaQueryRead(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "b2f6a1e4-9d3c-4f8a-9e21-6a4b7c8d9e0f",
+                "image_id": "6bdc72d1-dc8a-4dc0-a972-082f42c25c76",
+                "question": "Is this a rural or an urban area?",
+                "answers": [
+                    {
+                        "fusion": "elementwise",
+                        "answer": "urban",
+                        "confidence": 0.91,
+                        "alternatives": [
+                            {"answer": "urban", "confidence": 0.91},
+                            {"answer": "rural", "confidence": 0.07},
+                        ],
+                    },
+                    {
+                        "fusion": "cross_attention",
+                        "answer": "urban",
+                        "confidence": 0.88,
+                        "alternatives": [
+                            {"answer": "urban", "confidence": 0.88},
+                            {"answer": "rural", "confidence": 0.1},
+                        ],
+                    },
+                ],
+                "created_at": "2026-09-17T10:03:44.120000Z",
+            }
+        }
+    )
+
+    id: UUID
+    image_id: UUID
+    question: str
+    answers: list[VqaAnswerRead]
+    created_at: datetime
+
+    @classmethod
+    def from_domain(cls, query: VqaQuery) -> VqaQueryRead:
+        return cls(
+            id=query.id,
+            image_id=query.image_id,
+            question=query.question,
+            answers=[VqaAnswerRead.from_domain(a) for a in query.answers],
+            created_at=query.created_at,
         )
 
 

@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data.rsvqa_lr_dataset import AnswerVocabulary, RSVQALowResDataset
+from dataset.rsvqa_lr_dataset import AnswerVocabulary, RSVQALowResDataset
 from models.vqa_model import (
     CrossAttentionFusion,
     LitRSVQAModel,
@@ -29,7 +29,7 @@ from models.vqa_model import (
 )
 from scripts.train import evaluate, make_collate_fn, resolve_device
 
-DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "rsvqa_lr"
+DATA_ROOT = Path(__file__).resolve().parent.parent / "dataset" / "rsvqa_lr"
 VOCAB_PATH = DATA_ROOT / "answer_vocab.json"
 
 

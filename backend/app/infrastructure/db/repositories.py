@@ -12,13 +12,19 @@ from uuid import UUID
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.entities import AuditEvent, SatelliteImage, User
+from app.domain.entities import AuditEvent, SatelliteImage, User, VqaQuery
 from app.domain.enums import ImageFormat, ImageStatus, Role
-from app.domain.interfaces import AuditRepository, ImageRepository, UserRepository
+from app.domain.interfaces import (
+    AuditRepository,
+    ImageRepository,
+    UserRepository,
+    VqaQueryRepository,
+)
 from app.infrastructure.db.models import (
     AuditEventModel,
     ImageModel,
     UserModel,
+    VqaQueryModel,
     apply_image_changes,
     apply_user_changes,
     audit_to_domain,
@@ -27,6 +33,8 @@ from app.infrastructure.db.models import (
     image_to_model,
     user_to_domain,
     user_to_model,
+    vqa_query_to_domain,
+    vqa_query_to_model,
 )
 
 
@@ -219,3 +227,35 @@ class SqlAlchemyImageRepository(ImageRepository):
         if status is not None:
             stmt = stmt.where(ImageModel.status == status.value)
         return stmt
+
+
+class SqlAlchemyVqaQueryRepository(VqaQueryRepository):
+    """VQA question/answer persistence backed by SQLAlchemy."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, query: VqaQuery) -> VqaQuery:
+        model = vqa_query_to_model(query)
+        self._session.add(model)
+        await self._session.flush()
+        return vqa_query_to_domain(model)
+
+    async def get_by_id(self, query_id: UUID) -> VqaQuery | None:
+        model = await self._session.get(VqaQueryModel, query_id)
+        return vqa_query_to_domain(model) if model else None
+
+    async def list_for_image(
+        self, image_id: UUID, *, offset: int = 0, limit: int = 50
+    ) -> tuple[list[VqaQuery], int]:
+        stmt = select(VqaQueryModel).where(VqaQueryModel.image_id == image_id)
+        count_stmt = (
+            select(func.count())
+            .select_from(VqaQueryModel)
+            .where(VqaQueryModel.image_id == image_id)
+        )
+        total = int((await self._session.execute(count_stmt)).scalar_one())
+
+        stmt = stmt.order_by(VqaQueryModel.created_at.desc()).offset(offset).limit(limit)
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [vqa_query_to_domain(m) for m in models], total

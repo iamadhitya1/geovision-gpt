@@ -19,6 +19,7 @@ from app.domain.errors import (
     ConflictError,
     DomainError,
     FileTooLargeError,
+    ModelUnavailableError,
     NotFoundError,
     RateLimitExceededError,
     ValidationError,
@@ -43,6 +44,7 @@ _STATUS_MAP: tuple[tuple[type[DomainError], int], ...] = (
     (ConflictError, status.HTTP_409_CONFLICT),
     (FileTooLargeError, HTTP_413_TOO_LARGE),
     (ValidationError, HTTP_422_UNPROCESSABLE),
+    (ModelUnavailableError, status.HTTP_503_SERVICE_UNAVAILABLE),
 )
 
 

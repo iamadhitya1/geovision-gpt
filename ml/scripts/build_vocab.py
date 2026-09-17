@@ -13,12 +13,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from data.rsvqa_lr_dataset import AnswerVocabulary, load_split_examples
+from dataset.rsvqa_lr_dataset import AnswerVocabulary, load_split_examples
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "rsvqa_lr"
+DATA_ROOT = Path(__file__).resolve().parent.parent / "dataset" / "rsvqa_lr"
 VOCAB_PATH = DATA_ROOT / "answer_vocab.json"
 
 

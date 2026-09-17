@@ -1,0 +1,165 @@
+"""PyTorch-backed implementation of :class:`~app.domain.interfaces.VqaModelPort`.
+
+The only place ``torch``, ``transformers``, and ``timm`` are allowed to be imported
+outside ``ml/`` itself, mirroring how ``RasterImageAnalyzer`` owns ``rasterio``. Model
+classes come from ``ml/models/vqa_model.py`` (installed as a local path dependency — see
+``pyproject.toml``) rather than being duplicated here, so training and serving can never
+silently drift onto two different architectures.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import io
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import torch
+from dataset.rsvqa_lr_dataset import AnswerVocabulary
+from models.vqa_model import (
+    CrossAttentionFusion,
+    ImageEncoderName,
+    LitRSVQAModel,
+    build_image_transform,
+    build_tokenizer,
+)
+from PIL import Image, UnidentifiedImageError
+
+from app.core.logging import get_logger
+from app.domain.entities import AnswerAlternative, VqaAnswer
+from app.domain.enums import FusionType
+from app.domain.errors import CorruptImageError, ModelUnavailableError
+
+logger = get_logger(__name__)
+
+
+def resolve_device(preference: str) -> torch.device:
+    """``preference`` is ``"auto"``, ``"cpu"``, or ``"cuda"`` — see ``GVG_VQA_DEVICE`` in
+    ``core/config.py``. ``"auto"`` mirrors ``ml/scripts/train.py``'s own device selection,
+    so the same trained weights behave identically whichever way this process picks."""
+    if preference == "cpu":
+        return torch.device("cpu")
+    if preference == "cuda":
+        return torch.device("cuda")
+    return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+
+class TorchVqaModelRunner:
+    """Loads whichever trained checkpoints exist on disk and serves predictions from them.
+
+    A missing checkpoint file is logged and skipped, not a startup failure — the model
+    track and the web-app track of this project were built on different schedules (see
+    ``ml/README.md``), and the app must still start and serve the image-management
+    features even before a checkpoint has been copied down from the HPC cluster.
+    """
+
+    def __init__(
+        self,
+        *,
+        checkpoint_paths: dict[FusionType, Path],
+        vocab_path: Path,
+        device: str = "auto",
+        default_image_encoder: ImageEncoderName = "xcit_nano",
+    ) -> None:
+        self._device = resolve_device(device)
+        self._tokenizer: Any | None = None  # built lazily — see _tokenizer_instance()
+        self._image_transforms: dict[ImageEncoderName, Callable[[Image.Image], torch.Tensor]] = {}
+        self._models: dict[FusionType, LitRSVQAModel] = {}
+        self._model_encoders: dict[FusionType, ImageEncoderName] = {}
+
+        self._vocab: AnswerVocabulary | None = None
+        if vocab_path.exists():
+            self._vocab = AnswerVocabulary.from_json(vocab_path)
+        else:
+            logger.warning("vqa_vocab_missing", path=str(vocab_path))
+
+        for fusion, path in checkpoint_paths.items():
+            if not path.exists():
+                logger.warning("vqa_checkpoint_missing", fusion=fusion.value, path=str(path))
+                continue
+            self._models[fusion] = self._load_checkpoint(path, fusion)
+
+        logger.info(
+            "vqa_model_runner_ready",
+            device=str(self._device),
+            loaded_fusions=[f.value for f in self._models],
+        )
+
+    def _load_checkpoint(self, path: Path, fusion: FusionType) -> LitRSVQAModel:
+        checkpoint = torch.load(path, map_location=self._device, weights_only=False)
+        config = checkpoint["config"]
+        model = LitRSVQAModel(config)
+        if fusion is FusionType.CROSS_ATTENTION:
+            model.fusion = CrossAttentionFusion(
+                model.image_encoder.output_dim, model.text_encoder.output_dim, config.fusion_dim
+            )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(self._device)
+        model.eval()
+        self._model_encoders[fusion] = config.image_encoder
+        return model
+
+    def _transform_for(self, encoder: ImageEncoderName) -> Callable[[Image.Image], torch.Tensor]:
+        if encoder not in self._image_transforms:
+            self._image_transforms[encoder] = build_image_transform(encoder)
+        return self._image_transforms[encoder]
+
+    def _tokenizer_instance(self) -> Any:
+        """Loading BERT-Tiny's tokenizer costs real startup time (and, without a local HF
+        cache, a network round-trip) — not worth paying when no checkpoint ever actually
+        loaded, which is the common case on a machine the trained weights haven't been
+        copied to yet (see the class docstring)."""
+        if self._tokenizer is None:
+            self._tokenizer = build_tokenizer()
+        return self._tokenizer
+
+    def available_fusions(self) -> frozenset[FusionType]:
+        return frozenset(self._models.keys())
+
+    async def predict(
+        self, image_data: bytes, question: str, *, fusion: FusionType, top_k: int = 3
+    ) -> VqaAnswer:
+        if fusion not in self._models or self._vocab is None:
+            raise ModelUnavailableError(fusion=fusion.value)
+
+        return await asyncio.to_thread(self._predict_sync, image_data, question, fusion, top_k)
+
+    def _predict_sync(
+        self, image_data: bytes, question: str, fusion: FusionType, top_k: int
+    ) -> VqaAnswer:
+        assert self._vocab is not None  # checked in predict()
+        try:
+            image = Image.open(io.BytesIO(image_data)).convert("RGB")
+        except UnidentifiedImageError as exc:
+            raise CorruptImageError(
+                "Couldn't decode this image for the model — it may not actually be a "
+                "valid raster despite passing upload validation."
+            ) from exc
+
+        model = self._models[fusion]
+        transform = self._transform_for(self._model_encoders[fusion])
+        pixel_values = transform(image).unsqueeze(0).to(self._device)
+
+        tokenizer = self._tokenizer_instance()
+        encoded = tokenizer([question], padding=True, truncation=True, return_tensors="pt")
+        input_ids = encoded["input_ids"].to(self._device)
+        attention_mask = encoded["attention_mask"].to(self._device)
+
+        with torch.no_grad():
+            logits = model(pixel_values, input_ids, attention_mask)
+            probabilities = torch.softmax(logits, dim=-1)[0]
+
+        k = min(top_k, probabilities.shape[0])
+        top_probs, top_indices = torch.topk(probabilities, k=k)
+
+        alternatives = tuple(
+            AnswerAlternative(answer=self._vocab.decode(int(index)), confidence=float(prob))
+            for prob, index in zip(top_probs.tolist(), top_indices.tolist(), strict=True)
+        )
+        return VqaAnswer(
+            fusion=fusion,
+            answer=alternatives[0].answer,
+            confidence=alternatives[0].confidence,
+            alternatives=alternatives,
+        )

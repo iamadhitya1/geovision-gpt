@@ -36,8 +36,8 @@ frontend/.env*
 checkpoints/
 runs/
 wandb/
-ml/data/rsvqa_lr/
-ml/data/__pycache__/
+ml/dataset/rsvqa_lr/
+ml/dataset/__pycache__/
 ml/outputs/
 
 # Geospatial scratch

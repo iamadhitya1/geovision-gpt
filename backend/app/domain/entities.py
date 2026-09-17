@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus, Role
+from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageFormat, ImageStatus, Role
 
 
 def _now() -> datetime:
@@ -174,6 +174,48 @@ class SatelliteImage:
 
     def is_owned_by(self, user_id: UUID) -> bool:
         return self.owner_id == user_id
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerAlternative:
+    """One entry in a prediction's ranked shortlist — see :class:`VqaAnswer.alternatives`."""
+
+    answer: str
+    confidence: float  # softmax probability, 0.0-1.0
+
+
+@dataclass(frozen=True, slots=True)
+class VqaAnswer:
+    """One trained model variant's prediction for one question.
+
+    ``confidence`` is the top prediction's own softmax probability — genuinely reported,
+    not smoothed or hidden, so a low-confidence answer (most often on ``count`` questions;
+    see the project report's evaluation results) is visibly a low-confidence answer rather
+    than presented with false certainty.
+    """
+
+    fusion: FusionType
+    answer: str
+    confidence: float
+    alternatives: tuple[AnswerAlternative, ...]  # ranked, most confident first
+
+
+@dataclass(slots=True)
+class VqaQuery:
+    """A question asked about a satellite image, and every trained model variant's answer
+    to it — kept together so the baseline-vs-cross-attention comparison (the project's own
+    contribution) is a fact recorded once, not something recomputed from two rows.
+    """
+
+    image_id: UUID
+    asked_by: UUID
+    question: str
+    answers: tuple[VqaAnswer, ...]
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=_now)
+
+    def answer_for(self, fusion: FusionType) -> VqaAnswer | None:
+        return next((a for a in self.answers if a.fusion is fusion), None)
 
 
 @dataclass(slots=True)

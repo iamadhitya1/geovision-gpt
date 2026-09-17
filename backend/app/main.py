@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -21,6 +22,7 @@ from app.application.password_policy import PasswordPolicy
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.domain.enums import FusionType
 from app.infrastructure.bootstrap import ensure_first_admin
 from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
@@ -28,6 +30,7 @@ from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
 from app.infrastructure.security.password import Argon2PasswordHasher
 from app.infrastructure.security.tokens import JwtTokenService
 from app.infrastructure.storage.factory import build_storage
+from app.infrastructure.vqa.model_runner import TorchVqaModelRunner
 
 logger = get_logger(__name__)
 
@@ -35,8 +38,9 @@ DESCRIPTION = """
 **GeoVisionGPT** — a multi-modal Visual Question Answering system for satellite and Earth
 observation imagery, built on vision-language models.
 
-Modules 1 (**Authentication**) and 2 (**Images**) are implemented below. Modules 3-10
-will register additional sections under the same `/api/v1` prefix as they land.
+Modules 1 (**Authentication**), 2 (**Images**), and 3/4 (**VQA**) are implemented below.
+Later modules will register additional sections under the same `/api/v1` prefix as they
+land — see the module plan in `ml/README.md` and the project report.
 
 ### New here? Try this first
 
@@ -93,6 +97,17 @@ OPENAPI_TAGS: list[dict[str, str]] = [
         ),
     },
     {
+        "name": "VQA",
+        "description": (
+            "Ask a plain-English question about a `ready` image and get an answer from "
+            "the trained model(s) — see `ml/README.md`. Both the published baseline "
+            "(elementwise fusion) and this project's own cross-attention experiment "
+            "answer by default, side by side, so the comparison that is this project's "
+            "original contribution is visible in the API response itself, not only in "
+            "the report."
+        ),
+    },
+    {
         "name": "System",
         "description": "Liveness and readiness probes — no authentication required.",
     },
@@ -133,6 +148,14 @@ def build_state(app: FastAPI, settings: Settings) -> None:
     app.state.password_policy = PasswordPolicy(min_length=settings.password_min_length)
     app.state.storage = build_storage(settings)
     app.state.image_analyzer = RasterImageAnalyzer()
+    app.state.vqa_model = TorchVqaModelRunner(
+        checkpoint_paths={
+            FusionType.ELEMENTWISE: Path(settings.vqa_checkpoint_elementwise_path),
+            FusionType.CROSS_ATTENTION: Path(settings.vqa_checkpoint_cross_attention_path),
+        },
+        vocab_path=Path(settings.vqa_vocab_path),
+        device=settings.vqa_device,
+    )
 
 
 @asynccontextmanager
@@ -152,7 +175,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment.value,
         database="sqlite" if settings.is_sqlite else "postgresql",
         cache=settings.cache_backend,
-        inference_backend=settings.inference_backend,
+        vqa_fusions_loaded=[f.value for f in app.state.vqa_model.available_fusions()],
     )
 
     yield

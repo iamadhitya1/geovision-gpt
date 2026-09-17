@@ -86,18 +86,24 @@ flowchart TB
 
 ## 3. Module → layer mapping
 
+**Note:** this table (and the diagrams below it) described the original Phase-0 plan —
+Qwen2.5-VL, DOFA, SGV, a fully generative pipeline. That plan was superseded after the
+faculty guide's review (see `ml/README.md` and the project report); the model actually
+built and trained is LiT-4-RSVQA-style (BERT-Tiny + a lightweight image transformer,
+classification over 1,000 answers), and the web app's remaining modules were redesigned
+around what that model actually is. Row 1-4 below reflect the real, current system;
+rows 5+ and the diagrams in sections 2, 5, 8 still describe the superseded plan and
+haven't been rewritten yet — treat them as historical, not current.
+
 | # | Module | Domain | Application | Infrastructure | API |
 |---|---|---|---|---|---|
 | 1 | Authentication | `User`, `Role`, `AuditEvent` | `AuthService`, `AuditService` | SQLAlchemy repos, Argon2, JWT, Redis | `/api/v1/auth`, `/api/v1/users` |
 | 2 | Image management | `SatelliteImage`, `ImageMetadata` | `ImageService` | MinIO, rasterio reader | `/api/v1/images` |
-| 3 | Preprocessing | `PreprocessingRecipe`, `SpectralEvidence` | `PreprocessingService` | GDAL, OpenCV, NumPy | `/api/v1/preprocess` |
-| 4 | Feature extraction | `FeatureMap` | `FeatureService` | Qwen ViT, DOFA | internal |
-| 5 | Question understanding | `Question`, `Conversation` | `ConversationService` | tokenizers | `/api/v1/chat` |
-| 6 | Fusion | `FusionContext` | `FusionService` (SEI) | backend adapters | internal |
-| 7 | Answer generation | `Answer`, `Claim`, `Confidence` | `AnswerService` (CEV) | inference backends | `/api/v1/vqa` |
-| 8 | Explainable AI | `Attribution` | `ExplainabilityService` | Grad-CAM, attention rollout | `/api/v1/explain` |
-| 9 | GIS visualisation | `Layer`, `Geometry` | `LayerService` | GeoPandas, PostGIS | `/api/v1/gis` |
-| 10 | Analytics | `MetricSnapshot` | `AnalyticsService` | SQL aggregation | `/api/v1/analytics` |
+| 3 | VQA inference | `VqaQuery`, `VqaAnswer`, `FusionType` | `VqaService` | `TorchVqaModelRunner` (loads both trained checkpoints) | `/api/v1/images/{id}/ask` |
+| 4 | Question/answer API + model comparison | (same as above) | (same as above) | (same as above) | `/api/v1/vqa/fusions`, `/api/v1/images/{id}/vqa` |
+| 5 | Frontend | — | — | Next.js | separate app, not a backend router |
+| 6 | Map view | — | — | Leaflet/OpenLayers, reuses Module 2's metadata | frontend-only |
+| 7 | Usage dashboard | `MetricSnapshot` (planned) | `AnalyticsService` (planned) | SQL aggregation | `/api/v1/analytics` (planned) |
 
 ## 4. Repository layout
 
@@ -182,7 +188,7 @@ sequenceDiagram
     end
 ```
 
-## 7. ER diagram — Module 1 slice
+## 7. ER diagram — current schema (Modules 1-4)
 
 ```mermaid
 erDiagram
@@ -209,8 +215,40 @@ erDiagram
         json   detail
         ts     created_at
     }
+    IMAGES {
+        uuid   id PK
+        uuid   owner_id FK
+        string original_filename
+        string image_format
+        string status
+        string storage_key UK
+        string thumbnail_key
+        bigint file_size_bytes
+        string checksum_sha256
+        json   metadata_json
+        string error_message
+        ts     created_at
+        ts     updated_at
+    }
+    VQA_QUERIES {
+        uuid   id PK
+        uuid   image_id FK
+        uuid   asked_by FK
+        string question
+        json   answers_json "one entry per fusion variant"
+        ts     created_at
+    }
     USERS ||--o{ AUDIT_EVENTS : "generates"
+    USERS ||--o{ IMAGES : "owns"
+    USERS ||--o{ VQA_QUERIES : "asks"
+    IMAGES ||--o{ VQA_QUERIES : "is asked about"
 ```
+
+`answers_json` holds every trained model variant's answer to that one question together
+(elementwise baseline, cross-attention experiment), not as separate rows — see
+`VqaQuery`'s docstring in `app/domain/entities.py` for why: the baseline-vs-cross-attention
+comparison is one fact about a query, not something that could drift out of sync across
+rows.
 
 `token_version` is the revocation lever: bumping it invalidates every outstanding refresh token for
 that user without needing a database-backed token table.

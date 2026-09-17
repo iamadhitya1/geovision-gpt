@@ -92,11 +92,19 @@ class Settings(BaseSettings):
     first_admin_password: SecretStr = SecretStr("ChangeMe_Please_2026")
     first_admin_name: str = "Platform Administrator"
 
-    # --- Inference backend (Modules 6/7) ------------------------------------
-    inference_backend: Literal["null", "openai_compatible", "local_transformers"] = "null"
-    vlm_model_id: str = "Qwen/Qwen2.5-VL-7B-Instruct"
-    vlm_base_url: str = "https://openrouter.ai/api/v1"
-    vlm_api_key: SecretStr = SecretStr("")
+    # --- VQA model serving (Module 3) ----------------------------------------
+    # Paths to the trained checkpoints produced by ml/scripts/train.py on the institute
+    # HPC (see ml/README.md) — copied down manually, not downloaded automatically, since
+    # they only exist on the cluster until someone scp's them here. A missing file is
+    # logged and that fusion variant is simply reported unavailable, not a startup error;
+    # see TorchVqaModelRunner.
+    vqa_checkpoint_elementwise_path: str = "./checkpoints/xcit_nano_elementwise_epoch9.pt"
+    vqa_checkpoint_cross_attention_path: str = (
+        "./checkpoints/xcit_nano_cross_attention_epoch9.pt"
+    )
+    vqa_vocab_path: str = "./checkpoints/answer_vocab.json"
+    vqa_device: Literal["auto", "cpu", "cuda"] = "auto"
+    vqa_top_k_alternatives: int = Field(default=3, ge=1, le=20)
 
     # --- Derived helpers -----------------------------------------------------
     @property

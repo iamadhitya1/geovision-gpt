@@ -51,12 +51,12 @@ uv pip install -e ".[dev]"
 ## Dataset
 
 [RSVQA-LR](https://zenodo.org/records/6344334) (Lobry, Marcos, Murray & Tuia, IEEE TGRS
-2020) — already downloaded to `data/rsvqa_lr/`. 772 images (256×256, 3-band, uint8
+2020) — already downloaded to `dataset/rsvqa_lr/`. 772 images (256×256, 3-band, uint8
 GeoTIFF, Sentinel-2 over the Netherlands), 77,232 question-answer pairs across four
 question types (`presence`, `count`, `comp`, `rural_urban`).
 
 **A format quirk worth knowing** (documented in detail in
-`data/rsvqa_lr_dataset.py`): each split's JSON files contain a cumulative superset of
+`dataset/rsvqa_lr_dataset.py`): each split's JSON files contain a cumulative superset of
 entries; only ones flagged `"active": true` belong to that split. This was verified
 directly against the file contents, not assumed — filtering on it recovers exactly
 57,223 / 10,005 / 10,004 examples for train/val/test, summing to the documented 77,232
@@ -69,7 +69,7 @@ against `https://zenodo.org/records/6344334/files/<filename>?download=1` for eac
 ## Everyday commands
 
 ```bash
-# Build the answer vocabulary (run once; already done, output is in data/rsvqa_lr/answer_vocab.json)
+# Build the answer vocabulary (run once; already done, output is in dataset/rsvqa_lr/answer_vocab.json)
 python scripts/build_vocab.py
 
 # Smoke-test the model — proves the pipeline runs correctly, on ~30 examples, CPU, 1 epoch.
@@ -109,7 +109,7 @@ torch` pulled a newer-CUDA build that silently fell back to CPU; fixed by instal
 
 1. **Log in**: `ssh <username>@192.168.16.5` (Windows: via MobaXterm; Linux: any terminal).
    Change the emailed password with `passwd` on first login.
-2. **Upload `ml/`**: zip `ml/` (code + `data/rsvqa_lr/` — skip `.venv/` and `checkpoints/`)
+2. **Upload `ml/`**: zip `ml/` (code + `dataset/rsvqa_lr/` — skip `.venv/` and `checkpoints/`)
    and upload via MobaXterm's file panel, or `scp`/`rsync` from a terminal that can reach
    the intranet. Don't try to write this through `nano` — only the `.sbatch` scripts
    themselves have to be typed/pasted directly on the cluster (see step 4).

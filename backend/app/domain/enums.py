@@ -60,6 +60,18 @@ IMAGE_FORMAT_EXTENSIONS: dict[ImageFormat, frozenset[str]] = {
 }
 
 
+class FusionType(StrEnum):
+    """Which of the two trained model variants answered a question — see
+    ``ml/models/vqa_model.py``: ``ELEMENTWISE`` reproduces LiT-4-RSVQA's own published
+    baseline; ``CROSS_ATTENTION`` is this project's own experimental fusion mechanism.
+    Comparing the two is the project's original contribution, not just an implementation
+    detail — see docs/02-research-contribution.md.
+    """
+
+    ELEMENTWISE = "elementwise"
+    CROSS_ATTENTION = "cross_attention"
+
+
 class ImageStatus(StrEnum):
     """Processing lifecycle of an uploaded image.
 
@@ -103,6 +115,8 @@ class AuditAction(StrEnum):
     IMAGE_UPLOADED = "image.uploaded"
     IMAGE_PROCESSING_FAILED = "image.processing.failed"
     IMAGE_DELETED = "image.deleted"
+    VQA_QUERY_ANSWERED = "vqa.query.answered"
+    VQA_QUERY_FAILED = "vqa.query.failed"
 
 
 class AuditOutcome(StrEnum):
