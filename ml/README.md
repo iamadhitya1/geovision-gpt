@@ -17,10 +17,28 @@ every piece works. This README is the practical runbook.
 | Training/evaluation scripts written, full pipeline smoke-tested end to end | **Done** |
 | SLURM job scripts written (`ml/slurm/`) | **Done** |
 | HPC access | **Granted** — credentials received |
-| Real training run | **Next step** — see "On GPU day" |
+| Baseline (elementwise fusion) trained + evaluated on HPC | **Done** — see result below |
+| Cross-attention fusion (the actual experiment) | **In progress** on HPC |
 
-Everything above was built and verified without a GPU — the code hasn't changed since,
-only the SLURM scripts and this runbook were added once access actually arrived.
+### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
+
+`xcit_nano` + BERT-Tiny + elementwise fusion, 10 epochs, batch-size 64 (reduced from the
+paper's 512 — see "On GPU day" for why), tested on RSVQA-LR's true held-out test split
+(9,838 examples):
+
+| Metric | Value |
+|---|---|
+| Overall accuracy | **72.74%** |
+| Average accuracy (macro, matches paper's convention) | **75.16%** |
+| rural_urban / presence / comp / count | 92.0% / 90.7% / 90.4% / 27.5% |
+| Parameters | 8,217,896 |
+
+Above the paper's own reported 64.61% — though not a strict apples-to-apples comparison,
+since the paper trained on the much larger RSVQAxBEN (~15M examples derived from
+BigEarthNet-S2) rather than RSVQA-LR directly. `count` is the weak point, consistent with
+counting being the hardest question type in VQA generally (see the literature in the
+project report). The cross-attention comparison against this 75.16% baseline — the
+project's actual original contribution — is running now; see `ml/slurm/train_cross_attention.sbatch`.
 
 ## Setup
 
@@ -135,23 +153,19 @@ torch` pulled a newer-CUDA build that silently fell back to CPU; fixed by instal
    tail -f smoke_<job_id>.log         # watch it live
    ```
    Look for `Training complete.` with no errors before moving on.
-6. **Submit the real training job** the same way, from `ml/slurm/train.sbatch`:
-   ```bash
-   sbatch train.sbatch
-   ```
-   This runs `--image-encoder xcit_nano --fusion elementwise --epochs 10 --batch-size 512`
-   — the paper's own best configuration (64.61% average accuracy on their benchmark).
-   Monitor with `squeue -u $USER` / `tail -f train_<job_id>.log`; cancel with
-   `scancel <job_id>` if something's wrong. **Don't resubmit while it's pending** — it
-   starts on its own once resources free up.
-7. **Copy the checkpoint back** before it's cleaned up — `scp` or MobaXterm's file panel —
-   then evaluate on this machine or on the cluster:
-   ```bash
-   python scripts/evaluate.py --checkpoint checkpoints/xcit_nano_elementwise_epoch9.pt --split test
-   ```
-8. **The actual experiment**: copy `train.sbatch`, change `--fusion` to
-   `cross_attention`, submit, evaluate, and compare the two results. That comparison —
-   not just reproducing the paper — is the project's own contribution.
+6. **Submit the real training job**, from `ml/slurm/train.sbatch` — **done**, 2026-09-08
+   (job 4297). Runs `--image-encoder xcit_nano --fusion elementwise --epochs 10
+   --batch-size 64` (512, the paper's value, OOM'd on this cluster's ~9.5GB MIG slice —
+   see the script's own comments). Monitor with `squeue -u $USER` /
+   `tail -f train_<job_id>.log`; cancel with `scancel <job_id>` if something's wrong.
+   **Don't resubmit while it's pending** — it starts on its own once resources free up.
+7. **Evaluate on the test split**, from `ml/slurm/evaluate.sbatch` — **done**, job 4323:
+   **72.74% overall / 75.16% average accuracy**, see the Status section above for the
+   full breakdown.
+8. **The actual experiment** — **in progress**, job 4324 (`ml/slurm/train_cross_attention.sbatch`,
+   `ml/slurm/evaluate_cross_attention.sbatch`): identical setup, `--fusion cross_attention`
+   instead of `elementwise`. Comparing this against the 75.16% baseline — not just
+   reproducing the paper — is the project's own contribution.
 
 ## Architecture
 
