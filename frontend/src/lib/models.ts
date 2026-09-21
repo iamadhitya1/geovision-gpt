@@ -3,10 +3,11 @@ import type { FusionType } from "./types";
 // Full class strings (not template-built) so Tailwind's scanner sees every one of them.
 export const MODEL_INFO: Record<
   FusionType,
-  { label: string; short: string; blurb: string; text: string; bg: string; border: string; hex: string }
+  { label: string; name: string; short: string; blurb: string; text: string; bg: string; border: string; hex: string }
 > = {
   elementwise: {
     label: "Elementwise fusion",
+    name: "Elementwise",
     short: "Baseline",
     blurb: "Published LiT-4-RSVQA approach: image and question features are multiplied together.",
     text: "text-elementwise",
@@ -16,6 +17,7 @@ export const MODEL_INFO: Record<
   },
   cross_attention: {
     label: "Cross-attention fusion",
+    name: "Cross-attention",
     short: "This project",
     blurb: "The question attends over image features, so it can focus on the regions it asks about.",
     text: "text-cross",

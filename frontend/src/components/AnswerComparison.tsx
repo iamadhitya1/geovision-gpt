@@ -12,9 +12,9 @@ function AnswerColumn({ answer }: { answer: VqaAnswer }) {
 
   return (
     <div className={`rounded-sm border bg-panel p-4 ${info.border}/30`}>
-      <div className="flex items-baseline justify-between">
-        <span className={`font-mono text-[11px] uppercase tracking-wider ${info.text}`}>{info.label}</span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-faint">{info.short}</span>
+      <div className="space-y-0.5">
+        <div className={`font-mono text-[11px] uppercase tracking-wider ${info.text}`}>{info.name}</div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-faint">{info.short}</div>
       </div>
 
       <div className="mt-3 font-display text-4xl font-bold leading-none tracking-tight text-balance">
