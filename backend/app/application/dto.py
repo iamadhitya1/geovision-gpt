@@ -403,6 +403,32 @@ class VqaQueryRead(BaseModel):
         )
 
 
+class FusionUsageRead(BaseModel):
+    fusion: FusionType
+    answered: int
+    mean_confidence: float
+
+
+class AgreementRead(BaseModel):
+    """How often the two model variants gave the same top answer, over the questions both
+    of them answered — the live, in-app view of the project's baseline-vs-cross-attention
+    comparison (the held-out test-set accuracy lives in ``ml/README.md``)."""
+
+    compared: int
+    agreed: int
+
+
+class VqaStatsRead(BaseModel):
+    total_questions: int
+    # Everything below is computed over the most recent ``sample_size`` questions, so
+    # ``sample_size < total_questions`` means the figures describe the latest slice.
+    sample_size: int
+    images_queried: int
+    by_fusion: list[FusionUsageRead]
+    agreement: AgreementRead
+    recent: list[VqaQueryRead]
+
+
 class Page(BaseModel, Generic[T]):
     """Uniform pagination envelope reused by every list endpoint in the project."""
 

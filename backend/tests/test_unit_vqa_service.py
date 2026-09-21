@@ -114,6 +114,13 @@ class FakeVqaQueryRepository:
         matches = [q for q in self._queries.values() if q.image_id == image_id]
         return matches, len(matches)
 
+    async def list_recent_by_user(
+        self, user_id: UUID | None, *, limit: int
+    ) -> tuple[list[VqaQuery], int]:
+        matches = [q for q in self._queries.values() if user_id is None or q.asked_by == user_id]
+        matches.sort(key=lambda q: q.created_at, reverse=True)
+        return matches[:limit], len(matches)
+
 
 class FakeAuditRepository:
     def __init__(self) -> None:
@@ -265,3 +272,64 @@ async def test_ask_admin_can_query_any_users_image() -> None:
 
     query = await service.ask(image_id=image.id, question="Q", requesting_user=admin)
     assert len(query.answers) == 1
+
+
+def _answer(fusion: FusionType, text: str, confidence: float) -> VqaAnswer:
+    return VqaAnswer(
+        fusion=fusion,
+        answer=text,
+        confidence=confidence,
+        alternatives=(AnswerAlternative(answer=text, confidence=confidence),),
+    )
+
+
+async def test_stats_counts_agreement_and_mean_confidence() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    service = _build_service(
+        image=image,
+        model=FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE, FusionType.CROSS_ATTENTION})),
+    )
+    repo = service._queries
+    for elementwise, cross in [("yes", "yes"), ("no", "yes"), ("urban", "urban")]:
+        await repo.add(
+            VqaQuery(
+                image_id=image.id,
+                asked_by=owner.id,
+                question="q",
+                answers=(
+                    _answer(FusionType.ELEMENTWISE, elementwise, 0.6),
+                    _answer(FusionType.CROSS_ATTENTION, cross, 0.8),
+                ),
+            )
+        )
+
+    stats = await service.stats(owner)
+
+    assert stats.total_questions == 3
+    assert stats.images_queried == 1
+    assert (stats.agreement.compared, stats.agreement.agreed) == (3, 2)
+    by_fusion = {u.fusion: u for u in stats.by_fusion}
+    assert by_fusion[FusionType.ELEMENTWISE].mean_confidence == pytest.approx(0.6)
+    assert by_fusion[FusionType.CROSS_ATTENTION].mean_confidence == pytest.approx(0.8)
+
+
+async def test_stats_are_scoped_to_the_requesting_researcher_but_admins_see_all() -> None:
+    owner, other = _owner(), _owner()
+    image = _ready_image(owner.id)
+    service = _build_service(image=image, model=FakeVqaModel(loaded=frozenset()))
+    repo = service._queries
+    for asker in (owner, other, other):
+        await repo.add(
+            VqaQuery(
+                image_id=image.id,
+                asked_by=asker.id,
+                question="q",
+                answers=(_answer(FusionType.ELEMENTWISE, "yes", 0.5),),
+            )
+        )
+    admin = User(email="root@geovisiongpt.io", full_name="Root", password_hash="h", role=Role.ADMIN)
+
+    assert (await service.stats(owner)).total_questions == 1
+    assert (await service.stats(other)).total_questions == 2
+    assert (await service.stats(admin)).total_questions == 3

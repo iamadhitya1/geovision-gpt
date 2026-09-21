@@ -8,7 +8,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import ResearcherUser, get_request_context, get_vqa_service
-from app.application.dto import AskQuestionRequest, Page, RequestContext, VqaQueryRead
+from app.application.dto import (
+    AskQuestionRequest,
+    Page,
+    RequestContext,
+    VqaQueryRead,
+    VqaStatsRead,
+)
 from app.application.vqa_service import VqaService
 from app.domain.enums import FusionType
 
@@ -30,6 +36,16 @@ async def list_available_fusions(
     `ml/README.md`. It's normal for this to return an empty list, or just one fusion, on
     a machine the checkpoints haven't been copied to yet."""
     return sorted(service.available_fusions(), key=lambda f: f.value)
+
+
+@router.get(
+    "/vqa/stats",
+    summary="Usage statistics for the dashboard",
+    response_model=VqaStatsRead,
+)
+async def vqa_stats(researcher: ResearcherUser, service: VqaServiceDep) -> VqaStatsRead:
+    """A researcher sees figures for their own questions; an admin sees everyone's."""
+    return await service.stats(researcher)
 
 
 @router.post(
@@ -77,9 +93,7 @@ async def list_queries(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> Page[VqaQueryRead]:
-    queries, total = await service.list_for_image(
-        image_id, researcher, offset=offset, limit=limit
-    )
+    queries, total = await service.list_for_image(image_id, researcher, offset=offset, limit=limit)
     return Page[VqaQueryRead](
         items=[VqaQueryRead.from_domain(q) for q in queries],
         total=total,

@@ -136,9 +136,7 @@ class VqaQueryModel(Base):
     # Every fusion variant's answer to this one question, stored together rather than as
     # child rows — see VqaQuery's own docstring: the comparison is the point, so the two
     # (or however many) answers are one fact, not rows that could drift out of sync.
-    answers_json: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSON, default=list, nullable=False
-    )
+    answers_json: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), nullable=False, index=True

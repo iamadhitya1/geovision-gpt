@@ -99,9 +99,7 @@ class Settings(BaseSettings):
     # logged and that fusion variant is simply reported unavailable, not a startup error;
     # see TorchVqaModelRunner.
     vqa_checkpoint_elementwise_path: str = "./checkpoints/xcit_nano_elementwise_epoch9.pt"
-    vqa_checkpoint_cross_attention_path: str = (
-        "./checkpoints/xcit_nano_cross_attention_epoch9.pt"
-    )
+    vqa_checkpoint_cross_attention_path: str = "./checkpoints/xcit_nano_cross_attention_epoch9.pt"
     vqa_vocab_path: str = "./checkpoints/answer_vocab.json"
     vqa_device: Literal["auto", "cpu", "cuda"] = "auto"
     vqa_top_k_alternatives: int = Field(default=3, ge=1, le=20)

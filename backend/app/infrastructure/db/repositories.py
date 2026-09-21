@@ -259,3 +259,17 @@ class SqlAlchemyVqaQueryRepository(VqaQueryRepository):
         stmt = stmt.order_by(VqaQueryModel.created_at.desc()).offset(offset).limit(limit)
         models = (await self._session.execute(stmt)).scalars().all()
         return [vqa_query_to_domain(m) for m in models], total
+
+    async def list_recent_by_user(
+        self, user_id: UUID | None, *, limit: int
+    ) -> tuple[list[VqaQuery], int]:
+        stmt = select(VqaQueryModel)
+        count_stmt = select(func.count()).select_from(VqaQueryModel)
+        if user_id is not None:
+            stmt = stmt.where(VqaQueryModel.asked_by == user_id)
+            count_stmt = count_stmt.where(VqaQueryModel.asked_by == user_id)
+        total = int((await self._session.execute(count_stmt)).scalar_one())
+
+        stmt = stmt.order_by(VqaQueryModel.created_at.desc()).limit(limit)
+        models = (await self._session.execute(stmt)).scalars().all()
+        return [vqa_query_to_domain(m) for m in models], total

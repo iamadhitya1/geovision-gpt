@@ -12,7 +12,13 @@ import asyncio
 from uuid import UUID
 
 from app.application.audit_service import AuditService
-from app.application.dto import RequestContext
+from app.application.dto import (
+    AgreementRead,
+    FusionUsageRead,
+    RequestContext,
+    VqaQueryRead,
+    VqaStatsRead,
+)
 from app.core.logging import get_logger
 from app.domain.entities import SatelliteImage, User, VqaAnswer, VqaQuery
 from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageStatus
@@ -26,6 +32,9 @@ from app.domain.interfaces import (
 )
 
 logger = get_logger(__name__)
+
+_STATS_SAMPLE = 1000
+_RECENT_COUNT = 8
 
 
 class VqaService:
@@ -81,9 +90,7 @@ class VqaService:
 
         results = await asyncio.gather(
             *(
-                self._model.predict(
-                    image_bytes, question, fusion=fusion, top_k=self._default_top_k
-                )
+                self._model.predict(image_bytes, question, fusion=fusion, top_k=self._default_top_k)
                 for fusion in requested
             ),
             return_exceptions=True,
@@ -139,6 +146,41 @@ class VqaService:
         if image is None or not self._can_access(image, requesting_user):
             raise NotFoundError("Image not found.", image_id=str(image_id))
         return await self._queries.list_for_image(image_id, offset=offset, limit=limit)
+
+    async def stats(self, requesting_user: User) -> VqaStatsRead:
+        """Usage figures for the dashboard: a researcher sees their own questions, an admin
+        sees everyone's. Aggregated in Python over the latest ``_STATS_SAMPLE`` questions —
+        plenty for a research tool, and it keeps the port a simple "give me recent rows"
+        rather than pushing JSON-column aggregation into every database backend."""
+        owner_scope = None if requesting_user.is_admin else requesting_user.id
+        queries, total = await self._queries.list_recent_by_user(owner_scope, limit=_STATS_SAMPLE)
+
+        confidences: dict[FusionType, list[float]] = {}
+        compared = agreed = 0
+        for query in queries:
+            for answer in query.answers:
+                confidences.setdefault(answer.fusion, []).append(answer.confidence)
+            first = query.answer_for(FusionType.ELEMENTWISE)
+            second = query.answer_for(FusionType.CROSS_ATTENTION)
+            if first is not None and second is not None:
+                compared += 1
+                agreed += int(first.answer == second.answer)
+
+        return VqaStatsRead(
+            total_questions=total,
+            sample_size=len(queries),
+            images_queried=len({q.image_id for q in queries}),
+            by_fusion=[
+                FusionUsageRead(
+                    fusion=fusion,
+                    answered=len(values),
+                    mean_confidence=sum(values) / len(values),
+                )
+                for fusion, values in sorted(confidences.items(), key=lambda kv: kv[0].value)
+            ],
+            agreement=AgreementRead(compared=compared, agreed=agreed),
+            recent=[VqaQueryRead.from_domain(q) for q in queries[:_RECENT_COUNT]],
+        )
 
     @staticmethod
     def _can_access(image: SatelliteImage, user: User) -> bool:

@@ -106,6 +106,13 @@ class VqaQueryRepository(Protocol):
         self, image_id: UUID, *, offset: int = 0, limit: int = 50
     ) -> tuple[list[VqaQuery], int]: ...
 
+    async def list_recent_by_user(
+        self, user_id: UUID | None, *, limit: int
+    ) -> tuple[list[VqaQuery], int]:
+        """Newest-first queries asked by ``user_id`` (``None`` = everyone's, for admins),
+        plus the total count regardless of ``limit`` — feeds the dashboard's usage stats."""
+        ...
+
 
 @runtime_checkable
 class ObjectStorage(Protocol):
