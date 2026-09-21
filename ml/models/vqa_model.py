@@ -29,6 +29,7 @@ from torch import Tensor, nn
 from transformers import AutoModel, AutoTokenizer
 
 ImageEncoderName = Literal["xcit_nano", "deit_tiny", "mobilevit_s"]
+FusionName = Literal["elementwise", "cross_attention"]
 
 _TIMM_MODEL_NAMES: dict[ImageEncoderName, str] = {
     "xcit_nano": "xcit_nano_12_p16_224.fb_dist_in1k",
@@ -72,6 +73,15 @@ class ImageEncoder(nn.Module):
     def forward(self, pixel_values: Tensor) -> Tensor:
         return self.backbone(pixel_values)  # (batch, output_dim)
 
+    def forward_tokens(self, pixel_values: Tensor) -> Tensor:
+        """Every image token before pooling — (batch, num_tokens, output_dim). Cross-attention
+        needs these: it lets each question word look at individual image regions, which a
+        single pooled vector can't offer."""
+        tokens: Tensor = self.backbone.forward_features(pixel_values)
+        if tokens.dim() == 4:  # conv-style encoders (MobileViT) return a (B, C, H, W) map
+            tokens = tokens.flatten(2).transpose(1, 2)
+        return tokens
+
 
 class TextEncoder(nn.Module):
     """Wraps BERT-Tiny. Uses the [CLS] token's final hidden state as the sentence
@@ -90,6 +100,11 @@ class TextEncoder(nn.Module):
     def forward(self, input_ids: Tensor, attention_mask: Tensor) -> Tensor:
         outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
         return outputs.last_hidden_state[:, 0, :]  # (batch, output_dim) — the [CLS] token
+
+    def forward_tokens(self, input_ids: Tensor, attention_mask: Tensor) -> Tensor:
+        """One vector per question token — (batch, seq_len, output_dim)."""
+        outputs = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+        return outputs.last_hidden_state
 
 
 class ElementwiseProductFusion(nn.Module):
@@ -113,11 +128,17 @@ class ElementwiseProductFusion(nn.Module):
 
 
 class CrossAttentionFusion(nn.Module):
-    """An alternative fusion module: the question attends directly to the image features
-    (cross-attention, see Part 1 of the study notes) before combining, instead of squashing
-    each modality into one vector first. This is the natural candidate for the project's
-    own experimental contribution — swap this in for ElementwiseProductFusion and compare
-    accuracy on identical data/encoders to measure whether richer fusion actually helps.
+    """Fusion by cross-attention: every word of the question looks over all the image's
+    patch tokens and pulls in the regions relevant to it (see Part 1 of the study notes).
+    This is the project's own experiment, compared against ElementwiseProductFusion on
+    identical data and encoders.
+
+    Unlike the elementwise fusion it takes *sequences* — image patch tokens and question
+    word tokens — not one pooled vector each. That is essential, and is the fix for the
+    first version of this class: with each modality squashed to a single token, attention
+    ran over one key, softmax over one item is always exactly 1, and the question had zero
+    influence on the output (verified: changing the question changed the output by 0.0).
+    That version trained to 36% accuracy, the level of a model that never sees the question.
     """
 
     def __init__(self, image_dim: int, text_dim: int, fusion_dim: int, num_heads: int = 4) -> None:
@@ -125,18 +146,21 @@ class CrossAttentionFusion(nn.Module):
         self.image_proj = nn.Linear(image_dim, fusion_dim)
         self.text_proj = nn.Linear(text_dim, fusion_dim)
         self.cross_attn = nn.MultiheadAttention(fusion_dim, num_heads, batch_first=True)
+        self.norm = nn.LayerNorm(fusion_dim)
         self.output_dim = fusion_dim
 
-    def forward(self, image_features: Tensor, text_features: Tensor) -> Tensor:
-        # Treated as single-token sequences per modality: cross-attention here reduces to a
-        # learned, query-conditioned reweighting of the image vector by the question vector.
-        # A richer version would attend over per-patch image tokens rather than one pooled
-        # vector — a natural next step, not implemented here to keep the baseline honest
-        # about what it actually does.
-        image_token = self.image_proj(image_features).unsqueeze(1)  # (batch, 1, fusion_dim)
-        text_token = self.text_proj(text_features).unsqueeze(1)  # (batch, 1, fusion_dim)
-        attended, _ = self.cross_attn(query=text_token, key=image_token, value=image_token)
-        return attended.squeeze(1)
+    def forward(self, image_tokens: Tensor, text_tokens: Tensor, text_mask: Tensor) -> Tensor:
+        """``image_tokens`` (B, N, image_dim), ``text_tokens`` (B, L, text_dim),
+        ``text_mask`` (B, L) with 1 for real words and 0 for padding."""
+        image_kv = self.image_proj(image_tokens)  # (B, N, F): what each image region offers
+        text_q = self.text_proj(text_tokens)  # (B, L, F): what each word is looking for
+        attended, _ = self.cross_attn(query=text_q, key=image_kv, value=image_kv)
+        # Residual: each word keeps its own meaning alongside what it found in the image.
+        fused_tokens = self.norm(text_q + attended)  # (B, L, F)
+
+        # Average over real words only, so padding never dilutes the question's vector.
+        mask = text_mask.unsqueeze(-1).to(fused_tokens.dtype)
+        return (fused_tokens * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1.0)
 
 
 class Classifier(nn.Module):
@@ -160,7 +184,9 @@ class Classifier(nn.Module):
 class LitRSVQAModel(nn.Module):
     """The full pipeline: image + question in, answer-class logits out."""
 
-    def __init__(self, config: VqaModelConfig | None = None) -> None:
+    def __init__(
+        self, config: VqaModelConfig | None = None, fusion: FusionName = "elementwise"
+    ) -> None:
         super().__init__()
         self.config = config or VqaModelConfig()
 
@@ -168,7 +194,10 @@ class LitRSVQAModel(nn.Module):
             self.config.image_encoder, freeze=self.config.freeze_image_encoder
         )
         self.text_encoder = TextEncoder(freeze=self.config.freeze_text_encoder)
-        self.fusion = ElementwiseProductFusion(
+        fusion_cls = (
+            CrossAttentionFusion if fusion == "cross_attention" else ElementwiseProductFusion
+        )
+        self.fusion: ElementwiseProductFusion | CrossAttentionFusion = fusion_cls(
             self.image_encoder.output_dim, self.text_encoder.output_dim, self.config.fusion_dim
         )
         self.classifier = Classifier(
@@ -179,9 +208,16 @@ class LitRSVQAModel(nn.Module):
         )
 
     def forward(self, pixel_values: Tensor, input_ids: Tensor, attention_mask: Tensor) -> Tensor:
-        image_features = self.image_encoder(pixel_values)
-        text_features = self.text_encoder(input_ids, attention_mask)
-        fused = self.fusion(image_features, text_features)
+        if isinstance(self.fusion, CrossAttentionFusion):
+            fused = self.fusion(
+                self.image_encoder.forward_tokens(pixel_values),
+                self.text_encoder.forward_tokens(input_ids, attention_mask),
+                attention_mask,
+            )
+        else:
+            fused = self.fusion(
+                self.image_encoder(pixel_values), self.text_encoder(input_ids, attention_mask)
+            )
         return self.classifier(fused)
 
     def num_parameters(self, *, trainable_only: bool = False) -> int:

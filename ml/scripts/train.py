@@ -174,13 +174,7 @@ def main() -> None:
     )
 
     config = VqaModelConfig(image_encoder=image_encoder, num_answers=len(vocab))
-    model = LitRSVQAModel(config)
-    if args.fusion == "cross_attention":
-        from models.vqa_model import CrossAttentionFusion
-
-        model.fusion = CrossAttentionFusion(
-            model.image_encoder.output_dim, model.text_encoder.output_dim, config.fusion_dim
-        )
+    model = LitRSVQAModel(config, fusion=args.fusion)
     model.to(device)
 
     logger.info(

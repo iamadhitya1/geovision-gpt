@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dataset.rsvqa_lr_dataset import AnswerVocabulary, RSVQALowResDataset
 from models.vqa_model import (
-    CrossAttentionFusion,
     LitRSVQAModel,
     build_image_transform,
     build_tokenizer,
@@ -49,11 +48,7 @@ def main() -> None:
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     config = checkpoint["config"]
 
-    model = LitRSVQAModel(config)
-    if args.fusion == "cross_attention":
-        model.fusion = CrossAttentionFusion(
-            model.image_encoder.output_dim, model.text_encoder.output_dim, config.fusion_dim
-        )
+    model = LitRSVQAModel(config, fusion=args.fusion)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(device)
 

@@ -18,7 +18,8 @@ every piece works. This README is the practical runbook.
 | SLURM job scripts written (`ml/slurm/`) | **Done** |
 | HPC access | **Granted** — credentials received |
 | Baseline (elementwise fusion) trained + evaluated on HPC | **Done** — see result below |
-| Cross-attention fusion (the actual experiment) | **In progress** on HPC |
+| Cross-attention fusion, first attempt | **Failed by design flaw** — see "First cross-attention attempt" below |
+| Cross-attention fusion, corrected version (the actual experiment) | Fixed and locally tested; retrain on HPC pending |
 
 ### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
 
@@ -39,6 +40,31 @@ BigEarthNet-S2) rather than RSVQA-LR directly. `count` is the weak point, consis
 counting being the hardest question type in VQA generally (see the literature in the
 project report). The cross-attention comparison against this 75.16% baseline — the
 project's actual original contribution — is running now; see `ml/slurm/train_cross_attention.sbatch`.
+
+### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
+
+Test-split accuracy was **36.06% overall / 27.07% average** against the baseline's
+72.74% / 75.16%, with rural/urban and counting both at exactly 0.0. Validation accuracy sat
+at 36.09% or 34.57% from epoch 0 to epoch 9 and training loss never left ~2.4 — the pattern
+of a model that outputs nearly the same answer whatever it is asked.
+
+The cause was a design bug, not something cross-attention inherently does. That first
+`CrossAttentionFusion` reduced the image and the question to *one token each* and let the
+question attend over the image. With a single key, softmax over one item is always exactly 1,
+so the attention weights never depended on the question: changing the question changed the
+module's output by **0.0** (checked directly), while changing the image did change it. The
+classifier therefore never saw the question at all.
+
+**The fix** (`ml/models/vqa_model.py`): cross-attention now runs over *sequences* — every
+question-word token attends over all of the image's patch tokens, with a residual connection
+and a padding-aware average. `LitRSVQAModel(config, fusion=...)` now builds the fusion itself
+(previously `train.py`, `evaluate.py` and the backend each swapped it in by hand, which is how
+the bug went unnoticed). `ml/tests/test_fusion.py` now asserts, on random tensors, that both
+the question *and* the image change a fusion module's output — the check that would have
+caught this immediately.
+
+The old checkpoints are kept as evidence, not deleted, and this failed run is worth a
+paragraph in the report: it shows why the two fusion styles are not interchangeable.
 
 ## Setup
 

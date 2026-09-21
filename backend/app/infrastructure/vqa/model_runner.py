@@ -18,7 +18,6 @@ from typing import Any
 import torch
 from dataset.rsvqa_lr_dataset import AnswerVocabulary
 from models.vqa_model import (
-    CrossAttentionFusion,
     ImageEncoderName,
     LitRSVQAModel,
     build_image_transform,
@@ -89,11 +88,7 @@ class TorchVqaModelRunner:
     def _load_checkpoint(self, path: Path, fusion: FusionType) -> LitRSVQAModel:
         checkpoint = torch.load(path, map_location=self._device, weights_only=False)
         config = checkpoint["config"]
-        model = LitRSVQAModel(config)
-        if fusion is FusionType.CROSS_ATTENTION:
-            model.fusion = CrossAttentionFusion(
-                model.image_encoder.output_dim, model.text_encoder.output_dim, config.fusion_dim
-            )
+        model = LitRSVQAModel(config, fusion=fusion.value)
         model.load_state_dict(checkpoint["model_state_dict"])
         model.to(self._device)
         model.eval()
