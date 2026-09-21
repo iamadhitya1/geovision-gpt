@@ -20,12 +20,27 @@ export const RESULTS: Record<FusionType, FusionResult | null> = {
     average: 75.16,
     byType: { rural_urban: 92.0, presence: 90.7, comp: 90.4, count: 27.5 },
   },
-  cross_attention: null,
+  // Job 4332 (trained) / 4333 (evaluated), 2026-09-21: the corrected token-sequence version.
+  // The first attempt (job 4324) scored 36.06% because the question never reached the
+  // classifier — a design bug documented in ml/README.md, deliberately not shown here.
+  cross_attention: {
+    overall: 72.33,
+    average: 72.29,
+    byType: { rural_urban: 81.0, presence: 90.15, comp: 89.23, count: 28.77 },
+  },
 };
 
-export const QUESTION_TYPES: { key: keyof FusionResult["byType"]; label: string; hint: string }[] = [
-  { key: "rural_urban", label: "Rural / urban", hint: "Is this a rural or an urban area?" },
-  { key: "presence", label: "Presence", hint: "Is there a road / water area?" },
-  { key: "comp", label: "Comparison", hint: "Are there more roads than buildings?" },
-  { key: "count", label: "Counting", hint: "How many buildings are there?" },
+// `n` is the number of test questions of that type. It matters when reading the gaps:
+// rural/urban has only 100, so one model getting 11 more of them right moves that bar by 11
+// points — and, because "average accuracy" weights every type equally, moves the average too.
+export const QUESTION_TYPES: {
+  key: keyof FusionResult["byType"];
+  label: string;
+  hint: string;
+  n: number;
+}[] = [
+  { key: "rural_urban", label: "Rural / urban", hint: "Is this a rural or an urban area?", n: 100 },
+  { key: "presence", label: "Presence", hint: "Is there a road / water area?", n: 2955 },
+  { key: "comp", label: "Comparison", hint: "Are there more roads than buildings?", n: 4002 },
+  { key: "count", label: "Counting", hint: "How many buildings are there?", n: 2781 },
 ];

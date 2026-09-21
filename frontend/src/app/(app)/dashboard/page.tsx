@@ -36,7 +36,10 @@ function AccuracyBar({ value, fusion }: { value: number | null; fusion: keyof ty
 }
 
 function Benchmark() {
-  const pending = FUSION_ORDER.some((f) => RESULTS[f] === null);
+  const base = RESULTS.elementwise;
+  const cross = RESULTS.cross_attention;
+  const both = base !== null && cross !== null;
+  const overallGap = both ? cross.overall - base.overall : 0;
   return (
     <section className="space-y-4">
       <div>
@@ -72,7 +75,9 @@ function Benchmark() {
             <div key={t.key} className="grid gap-1 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-4">
               <div>
                 <div className="text-sm">{t.label}</div>
-                <div className="text-[11px] text-faint">{t.hint}</div>
+                <div className="text-[11px] text-faint">
+                  {t.hint} · {t.n.toLocaleString()} questions
+                </div>
               </div>
               <div className="space-y-1.5">
                 {FUSION_ORDER.map((f) => (
@@ -83,12 +88,25 @@ function Benchmark() {
           ))}
         </div>
 
-        <p className="mt-5 border-t border-line pt-4 text-xs leading-relaxed text-muted">
-          Counting is the hard case for every model of this size. The published LiT-4-RSVQA paper
-          reports 64.6%, but it trained on a much larger dataset, so the comparison
-          is indicative, not like-for-like.
-          {pending && " The cross-attention numbers appear here as soon as its evaluation finishes."}
-        </p>
+        <div className="mt-5 space-y-2 border-t border-line pt-4 text-xs leading-relaxed text-muted">
+          {both ? (
+            <p>
+              <span className="text-text">Overall, the two models are effectively tied</span>:{" "}
+              {Math.abs(overallGap).toFixed(1)} points apart on {TEST_SET_SIZE.toLocaleString()} questions.
+              Cross-attention is slightly ahead on counting and slightly behind on comparison. The
+              larger gap in <em>average</em> accuracy comes from rural/urban, which has only{" "}
+              {QUESTION_TYPES[0].n} test questions but counts for a quarter of that average. Each model
+              was trained once, so gaps this small shouldn&apos;t be read as a real difference.
+            </p>
+          ) : (
+            <p>The cross-attention numbers appear here as soon as its evaluation finishes.</p>
+          )}
+          <p>
+            Counting is the hard case for every model of this size. The published LiT-4-RSVQA paper
+            reports 64.6%, but it trained on a much larger dataset, so that comparison is indicative,
+            not like-for-like.
+          </p>
+        </div>
       </div>
     </section>
   );

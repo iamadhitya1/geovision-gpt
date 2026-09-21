@@ -19,7 +19,7 @@ every piece works. This README is the practical runbook.
 | HPC access | **Granted** — credentials received |
 | Baseline (elementwise fusion) trained + evaluated on HPC | **Done** — see result below |
 | Cross-attention fusion, first attempt | **Failed by design flaw** — see "First cross-attention attempt" below |
-| Cross-attention fusion, corrected version (the actual experiment) | Fixed and locally tested; retrain on HPC pending |
+| Cross-attention fusion, corrected version (the actual experiment) | **Done** — see "Cross-attention result" below |
 
 ### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
 
@@ -40,6 +40,31 @@ BigEarthNet-S2) rather than RSVQA-LR directly. `count` is the weak point, consis
 counting being the hardest question type in VQA generally (see the literature in the
 project report). The cross-attention comparison against this 75.16% baseline — the
 project's actual original contribution — is running now; see `ml/slurm/train_cross_attention.sbatch`.
+
+### Cross-attention result (2026-09-21, job 4332 trained / job 4333 evaluated)
+
+Same setup as the baseline (`xcit_nano` + BERT-Tiny, 10 epochs, batch 64), with the corrected
+token-sequence cross-attention fusion (9,269,544 parameters vs. 8,217,896). Held-out test
+split, 9,838 questions:
+
+| | Baseline (elementwise) | Cross-attention |
+|---|---|---|
+| Overall accuracy | **72.74%** | 72.33% |
+| Average accuracy | **75.16%** | 72.29% |
+| rural_urban (100 questions) | **92.0%** | 81.0% |
+| presence (2,955) | **90.7%** | 90.2% |
+| comp (4,002) | **90.4%** | 89.2% |
+| count (2,781) | 27.5% | **28.8%** |
+
+**Reading it honestly:** the two models are effectively tied overall (0.4 points, about 40
+questions). The 3-point gap in *average* accuracy comes almost entirely from rural/urban: only
+100 test questions, but the macro average weights it as a quarter of the score, so 11 more
+questions right for the baseline moves the average by almost 3 points. On the three large
+categories the models are within 1.3 points either way, with cross-attention slightly ahead on
+counting. Each model was trained once (one seed), so differences this size are not evidence
+that either fusion is better. The result is: **richer cross-attention fusion did not measurably
+improve on the published elementwise baseline in this setup**, at about 13% more parameters.
+Validation accuracy at epoch 9 tells the same story (73.8% vs. 74.1%).
 
 ### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
 

@@ -37,7 +37,7 @@ original framing.
 |---|---|---|
 | **Model** | Dataset (RSVQA-LR), architecture, training/eval scripts | **Complete** |
 | **Model** | Baseline (elementwise fusion) trained + evaluated on HPC | **Complete** — 72.74% overall / 75.16% average accuracy on the held-out test split |
-| **Model** | Cross-attention fusion (the project's own experiment) | Training run submitted; result pending — see [`ml/README.md`](ml/README.md) |
+| **Model** | Cross-attention fusion (the project's own experiment) | **Complete** — 72.33% overall / 72.29% average: effectively tied with the baseline; details and caveats in [`ml/README.md`](ml/README.md) |
 | Web app — Module 1 | Authentication, RBAC, audit | **Complete** |
 | Web app — Module 2 | Satellite image management | **Complete** |
 | Web app — Module 3/4 | VQA inference service + model comparison API | **Complete** |

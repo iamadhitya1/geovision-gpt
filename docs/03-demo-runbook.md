@@ -68,11 +68,14 @@ argument: small models are cheap to train and run, and still do well on this tas
 baseline trained in about 73 minutes on one GPU slice, and a question takes about 0.4
 seconds to answer on a laptop CPU (measured, one model).
 
-**What did the cross-attention experiment show?** State the number from the dashboard, and
-mention the first attempt failed: it collapsed each input to a single token, so the question
-had no effect on the output (36% accuracy). It was fixed by attending over all image patches,
-and a test now guards against it. Explaining a bug you found, diagnosed and fixed is a
-stronger answer than a clean result.
+**What did the cross-attention experiment show?** "It tied the baseline: 72.3% vs 72.7%
+overall on 9,838 held-out questions. Cross-attention was slightly better at counting and
+slightly worse at rural/urban, but that category has only 100 test questions, so I don't read
+it as a real difference. The honest result is that the richer fusion didn't measurably help
+here." Then, if there's time, the story that shows real engineering: the first attempt scored
+only 36% because I had collapsed each input to a single token, so the question had no effect
+on the output. I found it from the flat training curve, proved it with a direct test,
+fixed it by attending over all image patches, and added a test that guards against it.
 
 **Why is your accuracy higher than the paper's 64.6%?** The paper trained on a much larger
 dataset (RSVQAxBEN) and we train directly on RSVQA-LR, so the numbers aren't like-for-like.
