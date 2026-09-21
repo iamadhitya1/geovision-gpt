@@ -11,11 +11,12 @@
     .\scripts\dev.ps1 test
     .\scripts\dev.ps1 check
     .\scripts\dev.ps1 run
+    .\scripts\dev.ps1 demo     # everything for a live demo, one command
 #>
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('setup', 'run', 'test', 'lint', 'format', 'types', 'check', 'migrate', 'revision')]
+    [ValidateSet('setup', 'run', 'test', 'lint', 'format', 'types', 'check', 'migrate', 'revision', 'demo')]
     [string]$Task = 'check',
 
     [Parameter(Position = 1)]
@@ -57,6 +58,22 @@ switch ($Task) {
     'lint'     { Invoke-Py @('-m', 'ruff', 'check', '.') }
     'format'   { Invoke-Py @('-m', 'ruff', 'format', '.') }
     'types'    { Invoke-Py @('-m', 'mypy', 'app') }
+    'demo' {
+        # Everything a live demo needs: database up to date, backend, a production-mode
+        # frontend (no first-visit compile pauses, unlike `npm run dev`), and the browser.
+        $Frontend = Join-Path $PSScriptRoot '..\frontend' | Resolve-Path
+        $Checkpoints = Join-Path $Backend 'checkpoints'
+        if (-not (Test-Path (Join-Path $Checkpoints 'answer_vocab.json'))) {
+            Write-Warning "No answer_vocab.json in $Checkpoints - questions will fail until the trained checkpoints are copied there (see ml/README.md)."
+        }
+        Invoke-Py @('-m', 'alembic', 'upgrade', 'head')
+        # Child windows inherit GVG_SECRET_KEY from this session.
+        Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Backend'; & '$Python' -m uvicorn app.main:app --port 8000"
+        Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Frontend'; npm run build; npm run start"
+        Write-Host "Backend on :8000, frontend building then serving on :3000 (about 30s)." -ForegroundColor Green
+        Start-Sleep -Seconds 40
+        Start-Process 'http://localhost:3000'
+    }
     'migrate'  { Invoke-Py @('-m', 'alembic', 'upgrade', 'head') }
     'revision' { Invoke-Py @('-m', 'alembic', 'revision', '--autogenerate', '-m', $Message) }
     'check' {
