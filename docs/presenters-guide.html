@@ -1,0 +1,1372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoVisionGPT Review Brief</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --bg: #EEF1EC;
+    --surface: #FFFFFF;
+    --surface-sunken: #E4E9E2;
+    --ink: #17231F;
+    --ink-muted: #4B5A54;
+    --ink-faint: #7C8B84;
+    --accent: #A8641F;
+    --accent-ink: #7A4A17;
+    --verified: #2F7566;
+    --verified-bg: #E1EEE9;
+    --planned: #6B7770;
+    --planned-bg: #E4E9E2;
+    --warn: #9A5B12;
+    --warn-bg: #F6E9D3;
+    --line: #D3D9CF;
+    --line-strong: #B8C1B3;
+    --shadow: 220 25% 10%;
+
+    --font-display: "Spectral", "Iowan Old Style", "Palatino Linotype", serif;
+    --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10181A;
+      --surface: #172221;
+      --surface-sunken: #0D1416;
+      --ink: #ECE8DE;
+      --ink-muted: #A3B0A8;
+      --ink-faint: #6E7C75;
+      --accent: #E3A657;
+      --accent-ink: #F0BE7C;
+      --verified: #5FBBA4;
+      --verified-bg: #1B302B;
+      --planned: #8A9791;
+      --planned-bg: #1D2725;
+      --warn: #E3A657;
+      --warn-bg: #2E2416;
+      --line: #263130;
+      --line-strong: #37433F;
+      --shadow: 0 0% 0%;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10181A;
+    --surface: #172221;
+    --surface-sunken: #0D1416;
+    --ink: #ECE8DE;
+    --ink-muted: #A3B0A8;
+    --ink-faint: #6E7C75;
+    --accent: #E3A657;
+    --accent-ink: #F0BE7C;
+    --verified: #5FBBA4;
+    --verified-bg: #1B302B;
+    --planned: #8A9791;
+    --planned-bg: #1D2725;
+    --warn: #E3A657;
+    --warn-bg: #2E2416;
+    --line: #263130;
+    --line-strong: #37433F;
+    --shadow: 0 0% 0%;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent); color: var(--surface); }
+
+  a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+  p { margin: 0 0 1em; }
+  p:last-child { margin-bottom: 0; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .masthead {
+    position: relative;
+    padding: 4.5rem 1.5rem 3.5rem;
+    background:
+      radial-gradient(circle at 82% 15%, hsla(30, 55%, 55%, 0.10), transparent 45%),
+      var(--surface-sunken);
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  .masthead::before {
+    content: "";
+    position: absolute;
+    inset: -20% -10% auto auto;
+    width: 620px;
+    height: 620px;
+    background:
+      repeating-radial-gradient(circle at center,
+        transparent 0, transparent 27px,
+        var(--line-strong) 28px, var(--line-strong) 29px);
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .masthead-inner { position: relative; max-width: 46rem; margin: 0 auto; }
+
+  .masthead h1 {
+    font-size: clamp(2.1rem, 4.4vw, 2.9rem);
+    letter-spacing: -0.01em;
+    margin: 0.6rem 0 0.9rem;
+  }
+
+  .masthead .lede { font-size: 1.09rem; color: var(--ink-muted); max-width: 40rem; }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+    margin-top: 1.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+
+  .page {
+    max-width: 74rem;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 13rem minmax(0, 1fr);
+    gap: 3rem;
+    align-items: start;
+  }
+
+  nav.toc { position: sticky; top: 2rem; padding: 1.7rem 0 2rem; font-size: 0.86rem; }
+  nav.toc ol { list-style: none; margin: 0.6rem 0 0; padding: 0; border-left: 1px solid var(--line); }
+  nav.toc li { margin: 0; }
+  nav.toc a {
+    display: block;
+    padding: 0.32rem 0 0.32rem 0.85rem;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--ink-muted);
+    text-decoration: none;
+  }
+  nav.toc a:hover { color: var(--ink); border-left-color: var(--line-strong); }
+  nav.toc .toc-num { font-family: var(--font-mono); color: var(--ink-faint); margin-right: 0.4em; }
+
+  main { min-width: 0; padding: 3rem 0 6rem; }
+
+  section { padding-top: 2.6rem; margin-top: 2.6rem; border-top: 1px solid var(--line); }
+  section:first-child { padding-top: 0; margin-top: 0; border-top: none; }
+  section > .eyebrow { display: block; margin-bottom: 0.5rem; }
+  section h2 { font-size: 1.5rem; margin-bottom: 1.1rem; }
+  section h3 {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--ink);
+    margin: 1.6rem 0 0.6rem;
+  }
+
+  .prose { max-width: 42rem; }
+  .prose p { color: var(--ink); }
+  .prose .lead { font-size: 1.06rem; color: var(--ink-muted); }
+
+  ul.plain, ol.plain { padding-left: 1.2rem; margin: 0 0 1em; max-width: 42rem; }
+  ul.plain li, ol.plain li { margin-bottom: 0.45rem; }
+
+  strong { font-weight: 600; }
+
+  code, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--surface-sunken);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.05em 0.35em;
+  }
+
+  .pitch {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1.4rem 1.6rem;
+    margin: 1.2rem 0 1.6rem;
+    max-width: 42rem;
+  }
+  .pitch .label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .pitch p { font-family: var(--font-display); font-size: 1.12rem; line-height: 1.55; color: var(--ink); }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 1.6rem; }
+
+  table.modules { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 34rem; }
+  table.modules caption { text-align: left; font-size: 0.8rem; color: var(--ink-faint); margin-bottom: 0.6rem; }
+  table.modules th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 500;
+    padding: 0 0.8rem 0.6rem 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  table.modules td {
+    padding: 0.65rem 0.8rem 0.65rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.modules tr:last-child td { border-bottom: none; }
+  table.modules .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  table.modules .name { font-weight: 600; }
+  table.modules .scope { color: var(--ink-muted); }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    padding: 0.2em 0.6em;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+  .pill.live { background: var(--verified-bg); color: var(--verified); }
+  .pill.live::before { background: var(--verified); }
+  .pill.planned { background: var(--planned-bg); color: var(--planned); }
+  .pill.planned::before { background: var(--planned); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.warn::before { background: var(--warn); }
+
+  table.compare { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 32rem; }
+  table.compare th, table.compare td { padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.compare th:first-child, table.compare td:first-child { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.78rem; width: 30%; }
+  table.compare thead th { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-faint); border-bottom: 1px solid var(--line-strong); }
+  table.compare td.num, table.compare th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+  table.compare td.win { color: var(--verified); font-weight: 600; }
+
+  .lit-list { display: flex; flex-direction: column; gap: 0.9rem; max-width: 42rem; }
+  .lit-item { padding: 0.95rem 1.1rem; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; }
+  .lit-item .lit-name { font-weight: 600; margin-right: 0.4em; }
+  .lit-item .lit-tag { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+  .lit-item p { margin-top: 0.35rem; color: var(--ink-muted); font-size: 0.93rem; }
+
+  .qa { max-width: 42rem; margin-bottom: 1.4rem; }
+  .qa .q {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    color: var(--accent-ink);
+    display: flex;
+    gap: 0.55em;
+    margin-bottom: 0.4rem;
+  }
+  .qa .q::before { content: "Q"; opacity: 0.7; }
+  .qa .a { color: var(--ink); }
+  .qa .a .flag {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-sunken);
+    border-left: 2px solid var(--planned);
+    border-radius: 2px;
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+  }
+
+  .callout {
+    max-width: 42rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1.1rem 1.3rem;
+    font-size: 0.95rem;
+    color: var(--ink-muted);
+    margin-bottom: 1.4rem;
+  }
+  .callout strong { color: var(--ink); }
+
+  .diagram { margin: 1.4rem 0 1.8rem; max-width: 56rem; }
+  .diagram-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 1rem; }
+  .diagram svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  .diagram figcaption { font-size: 0.85rem; color: var(--ink-faint); margin-top: 0.6rem; max-width: 42rem; }
+  .svg-box { fill: var(--surface-sunken); stroke: var(--line-strong); stroke-width: 1.2; }
+  .svg-a { fill: var(--verified-bg); stroke: var(--verified); stroke-width: 1.4; }
+  .svg-b { fill: var(--warn-bg); stroke: var(--accent); stroke-width: 1.4; }
+  .svg-frame { fill: none; stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .svg-line { fill: none; stroke: var(--ink-faint); stroke-width: 1.5; }
+  .svg-arrow { fill: var(--ink-faint); }
+  .svg-t { fill: var(--ink); font-family: var(--font-body); font-size: 13px; font-weight: 600; }
+  .svg-s { fill: var(--ink-muted); font-family: var(--font-body); font-size: 11px; }
+
+  dl.terms { max-width: 42rem; margin: 0 0 1.2rem; }
+  dl.terms dt { font-weight: 600; margin-top: 0.9rem; }
+  dl.terms dd { margin: 0.15rem 0 0; color: var(--ink-muted); font-size: 0.95rem; }
+
+  table.facts { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 30rem; max-width: 44rem; }
+  table.facts th { text-align: left; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); font-weight: 500; padding: 1.2rem 0.8rem 0.4rem 0; border-bottom: 1px solid var(--line-strong); }
+  table.facts td { padding: 0.5rem 0.8rem 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.facts td:first-child { color: var(--ink-muted); width: 34%; }
+  table.facts td.v { font-family: var(--font-mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+  footer {
+    max-width: 74rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+
+  @media (max-width: 880px) {
+    .page { grid-template-columns: 1fr; }
+    nav.toc { position: static; padding: 1.2rem 0; border-bottom: 1px solid var(--line); margin-bottom: 0.5rem; }
+    nav.toc ol { display: flex; flex-wrap: wrap; gap: 0.3rem 0.2rem; border-left: none; }
+    nav.toc a { border: 1px solid var(--line); border-radius: 100px; padding: 0.3rem 0.8rem; margin: 0; }
+    main { padding-top: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <span class="eyebrow">Project review preparation · GeoVisionGPT · B.Tech Project</span>
+    <h1>How to explain the project when your guide asks</h1>
+    <p class="lede">
+      Everything you need to present GeoVisionGPT to a crowd or to your guide: the pitch,
+      how it works, the real results (including the ones that aren't flattering), a live demo
+      script, the numbers, a glossary, and the questions to expect.
+    </p>
+    <div class="meta-row">
+      <span>STATUS: MODEL TRAINED &amp; TESTED · WEB APP COMPLETE · DEMO-READY</span>
+      <span>REPO: geovision-gpt</span>
+      <span>UPDATED 2026-09-21</span>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <nav class="toc" aria-label="Section navigation">
+    <span class="eyebrow">Contents</span>
+    <ol>
+      <li><a href="#pitch"><span class="toc-num">01</span>The pitch</a></li>
+      <li><a href="#plan"><span class="toc-num">02</span>Talk lengths &amp; audiences</a></li>
+      <li><a href="#how"><span class="toc-num">03</span>How it works</a></li>
+      <li><a href="#status"><span class="toc-num">04</span>Where it stands</a></li>
+      <li><a href="#results"><span class="toc-num">05</span>The results</a></li>
+      <li><a href="#demo"><span class="toc-num">06</span>Live demo script</a></li>
+      <li><a href="#numbers"><span class="toc-num">07</span>Numbers cheat-sheet</a></li>
+      <li><a href="#decisions"><span class="toc-num">08</span>Why this plan</a></li>
+      <li><a href="#vqa"><span class="toc-num">09</span>The VQA background</a></li>
+      <li><a href="#literature"><span class="toc-num">10</span>Papers to name</a></li>
+      <li><a href="#glossary"><span class="toc-num">11</span>Glossary</a></li>
+      <li><a href="#questions"><span class="toc-num">12</span>Expect these questions</a></li>
+      <li><a href="#ownership"><span class="toc-num">13</span>Do it yourself</a></li>
+      <li><a href="#unknown"><span class="toc-num">14</span>If you don't know</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="pitch">
+      <span class="eyebrow">01 — Open with this</span>
+      <h2>The pitch</h2>
+      <div class="prose">
+        <p class="lead">Two versions — the one-breath version, and the one with substance
+          underneath it if your guide leans in.</p>
+
+        <div class="pitch">
+          <span class="label">Ten seconds</span>
+          <p>"I built and trained my own visual question answering model for satellite
+            images — not an existing AI model called through an API, but a model I
+            assembled, trained on the institute's GPU cluster, and evaluated myself. And
+            there's a working web app on top, so I can show it live."</p>
+        </div>
+
+        <div class="pitch">
+          <span class="label">If they lean in</span>
+          <p>"The architecture follows a published paper, LiT-4-RSVQA — a small pretrained
+            image transformer plus BERT-Tiny for the question, fused, then classified into
+            one of a thousand answers. It's about 8 million parameters, not billions,
+            because that's what actually fits on a shared GPU in a semester. I reproduced
+            the paper's design and got 75.2% average accuracy on data the model never saw.
+            My own experiment was replacing the paper's simple fusion with cross-attention.
+            It tied the baseline — 72.3% against 72.7% overall — so the richer fusion
+            didn't measurably help. That's an honest result, and I can tell you about the
+            first attempt, which failed for an interesting reason. I also measured how much of the
+            score is just guessing from the wording of the question: a model that never sees the
+            image gets 70.4%, so the image adds about two points overall, and clearly more on
+            urban-versus-rural."</p>
+        </div>
+
+        <p>Say the ten-second version first, always. Only go to the second one if they
+          ask a follow-up — don't front-load the technical version, it reads as reciting
+          rather than understanding.</p>
+      </div>
+    </section>
+
+
+    <section id="plan">
+      <span class="eyebrow">02 — Choose your length</span>
+      <h2>Presenting it: three lengths, two audiences</h2>
+      <div class="prose">
+        <p class="lead">You may present to a crowd, to Ashish alone, or both. The content is the
+          same; the order and the jargon change.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th>Length</th><th>Best for</th><th>Shape</th></tr></thead>
+          <tbody>
+            <tr><td>1 minute</td><td>Someone at your stall; opening a longer talk</td><td>Ten-second pitch → one picture (the app, or the pipeline diagram) → one number → "want to see it?"</td></tr>
+            <tr><td>5 minutes</td><td>A crowd, an open day, a short slot</td><td>The problem (30 s) → what I built (60 s) → <strong>live demo</strong>: urban vs. rural (2 min) → result and its honest limit (60 s) → what I learned (30 s)</td></tr>
+            <tr><td>15 minutes</td><td>Ashish, a formal evaluation, a viva</td><td>Problem and why a small model (2 min) → data and how it works (3) → baseline result (1.5) → my experiment and the failed first attempt (3) → results and the no-image floor (2) → demo (2) → limits and future work (1.5)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3>What changes between a crowd and Ashish</h3>
+        <ul class="plain">
+          <li><strong>A crowd:</strong> lead with the demo and the picture. Say "a small AI model
+            that reads the image and the question", not "XCiT-Nano". One number to leave them
+            with: it answers about 73 out of 100 questions correctly on images it never saw, and
+            it tells an urban scene from a rural one.</li>
+          <li><strong>Ashish:</strong> lead with the experiment and the honest result. Expect "why"
+            at every step, and be ready to open the code (§13). He asked for understanding of the
+            model's insides, so this is where the failed-attempt story and the no-image baseline
+            count for the most.</li>
+          <li><strong>Either way:</strong> say what the project is not — it can't write sentences,
+            it can't count, and the two models tied. Saying it first reads as control.</li>
+        </ul>
+
+        <h3>If you use slides — 11 that cover everything</h3>
+        <ol class="plain">
+          <li>Title, and the ten-second pitch</li>
+          <li>The problem: satellite images, plain-English questions</li>
+          <li>Why a small model (8 million parameters, not billions) — the LiT-4-RSVQA argument</li>
+          <li>The data: RSVQA-LR, what a question and answer look like</li>
+          <li>The architecture: the pipeline diagram from §03</li>
+          <li>Baseline result: 72.7% overall, 75.2% average, per question type</li>
+          <li>My experiment: cross-attention instead of the simple fusion</li>
+          <li>The first attempt that failed (36%) and why — flat curve, softmax over one item</li>
+          <li>Final results table with the no-image bar</li>
+          <li>Live demo (or screenshots as a fallback)</li>
+          <li>Limits and future work; then questions. Keep backup slides: the four cluster
+            problems, the parameter counts, the layered backend.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="how">
+      <span class="eyebrow">03 — Know this cold</span>
+      <h2>How it works, end to end</h2>
+      <div class="prose">
+        <p class="lead">One picture and six plain steps. If you can draw this from memory and say
+          each step in a sentence, you can handle most questions.</p>
+      </div>
+
+      <figure class="diagram">
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 900 340" role="img" aria-label="Pipeline: a satellite image goes through the XCiT-Nano image encoder and a question goes through the BERT-Tiny text encoder; both feed a fusion module, which is either the elementwise baseline or the cross-attention experiment; a classifier then scores 1,000 possible answers and returns the answer with a confidence.">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L10 5 L0 10 z" class="svg-arrow"/>
+              </marker>
+            </defs>
+
+            <rect class="svg-box" x="10" y="30" width="130" height="76" rx="6"/>
+            <text class="svg-t" x="22" y="58">Satellite image</text>
+            <text class="svg-s" x="22" y="78">256 × 256 pixels</text>
+            <text class="svg-s" x="22" y="93">3 colour bands</text>
+
+            <rect class="svg-box" x="180" y="30" width="170" height="76" rx="6"/>
+            <text class="svg-t" x="192" y="58">XCiT-Nano</text>
+            <text class="svg-s" x="192" y="78">image encoder (pretrained)</text>
+            <text class="svg-s" x="192" y="93">197 vectors × 128 numbers</text>
+
+            <rect class="svg-box" x="10" y="234" width="130" height="76" rx="6"/>
+            <text class="svg-t" x="22" y="262">Question</text>
+            <text class="svg-s" x="22" y="282">plain English text</text>
+            <text class="svg-s" x="22" y="297">"Is there a road?"</text>
+
+            <rect class="svg-box" x="180" y="234" width="170" height="76" rx="6"/>
+            <text class="svg-t" x="192" y="262">BERT-Tiny</text>
+            <text class="svg-s" x="192" y="282">text encoder (pretrained)</text>
+            <text class="svg-s" x="192" y="297">one 128-number vector per word</text>
+
+            <rect class="svg-frame" x="395" y="92" width="205" height="156" rx="6"/>
+            <text class="svg-t" x="407" y="114">Fusion — the step I tested</text>
+            <rect class="svg-a" x="407" y="126" width="181" height="50" rx="4"/>
+            <text class="svg-t" x="417" y="146">A · Elementwise</text>
+            <text class="svg-s" x="417" y="163">baseline: multiply two summaries</text>
+            <rect class="svg-b" x="407" y="184" width="181" height="52" rx="4"/>
+            <text class="svg-t" x="417" y="204">B · Cross-attention</text>
+            <text class="svg-s" x="417" y="221">each word looks over the patches</text>
+
+            <rect class="svg-box" x="642" y="120" width="112" height="100" rx="6"/>
+            <text class="svg-t" x="654" y="152">Classifier</text>
+            <text class="svg-s" x="654" y="172">small neural net</text>
+            <text class="svg-s" x="654" y="187">1,000 scores</text>
+
+            <rect class="svg-box" x="790" y="120" width="100" height="100" rx="6"/>
+            <text class="svg-t" x="802" y="152">Answer</text>
+            <text class="svg-s" x="802" y="172">+ confidence</text>
+            <text class="svg-s" x="802" y="187">+ runners-up</text>
+
+            <path class="svg-line" d="M140 68 H180" marker-end="url(#arr)"/>
+            <path class="svg-line" d="M140 272 H180" marker-end="url(#arr)"/>
+            <path class="svg-line" d="M350 68 H372 V150 H395" marker-end="url(#arr)"/>
+            <path class="svg-line" d="M350 272 H372 V190 H395" marker-end="url(#arr)"/>
+            <path class="svg-line" d="M600 170 H642" marker-end="url(#arr)"/>
+            <path class="svg-line" d="M754 170 H790" marker-end="url(#arr)"/>
+          </svg>
+        </div>
+        <figcaption>Two models share everything except the fusion box: A is the published
+          LiT-4-RSVQA design, B is this project's own experiment. Both are trained the same way
+          on the same data.</figcaption>
+      </figure>
+
+      <div class="prose">
+        <ol class="plain">
+          <li><strong>The picture goes in.</strong> The 256 × 256 satellite image is resized to
+            224 × 224 and cut into a 14 × 14 grid of small squares (196 patches). XCiT-Nano, a
+            small pretrained "transformer" image model, turns each patch — plus one summary of the
+            whole image — into a list of 128 numbers: 197 lists in all.</li>
+          <li><strong>The question goes in.</strong> The question is split into word pieces and
+            BERT-Tiny turns each piece into 128 numbers, using the surrounding words for context.</li>
+          <li><strong>Fusion — the step I experimented with.</strong> Now the model must combine
+            what it sees with what it was asked. <em>A (baseline):</em> squash each side into one
+            list of 512 numbers and multiply the two together position by position.
+            <em>B (mine):</em> let every word of the question look across all 197 image lists,
+            weight the ones that matter to that word, and pull that information in.</li>
+          <li><strong>The classifier decides.</strong> A small network turns the fused numbers into
+            1,000 scores, one per possible answer. Softmax converts them to probabilities that add
+            up to 100%. The app shows the top answer, its probability (the "confidence"), and the
+            next-best answers.</li>
+          <li><strong>How it learned.</strong> It saw 57,223 training questions. For each, it
+            guessed; a "loss" measured how far the guess was from the right answer; an optimiser
+            (AdamW) nudged all ~8 million numbers a little (learning rate 5e-4). That happened 64
+            questions at a time, ten full passes ("epochs") over the data, about 73 minutes on one
+            GPU slice. Nothing was frozen: the pretrained image and text models were fine-tuned
+            too, which the paper found is worth about 13 points over starting from scratch.
+            After every epoch it was scored on a separate validation set to watch for
+            memorising.</li>
+          <li><strong>How it was tested.</strong> On 9,838 test questions that were never used to
+            train it or to make any decision. The final-epoch model was scored once — no picking
+            the best epoch on the test set.</li>
+        </ol>
+
+        <h3>How the web app fits around it</h3>
+        <ul class="plain">
+          <li>The <strong>browser</strong> (Next.js) signs you in and uploads an image.</li>
+          <li>The <strong>backend</strong> (FastAPI) checks the file really is the type it claims,
+            reads its location data, stores it with a thumbnail, and remembers who owns it.</li>
+          <li>When you ask a question, the backend checks you own the image, runs <em>both</em>
+            models (off the main thread so the server stays responsive), saves the question and
+            both answers in the database, and returns them. About 0.4 seconds per model on a
+            laptop CPU.</li>
+          <li>The <strong>map</strong> draws images at their real coordinates; the
+            <strong>dashboard</strong> shows the measured accuracy and your usage.</li>
+          <li>Inside the backend, code is in four layers — domain rules, use cases,
+            infrastructure, API — and a test fails the build if an inner layer ever depends on an
+            outer one.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="status">
+      <span class="eyebrow">04 — Be exact about progress</span>
+      <h2>Where the project actually stands</h2>
+      <div class="prose">
+        <p class="lead">Both tracks are finished. The model is the main deliverable and
+          the web app is the way to demonstrate it — say that plainly if asked which
+          matters more.</p>
+
+        <h3>Model track — the main deliverable</h3>
+      </div>
+
+      <div class="table-wrap">
+        <table class="modules">
+          <caption>Trained on the institute's HPC (one MIG slice of an A100), submitted through SLURM.</caption>
+          <thead>
+            <tr><th>Stage</th><th>Detail</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="name">Dataset</td><td class="scope">RSVQA-LR: 772 images, 77,232 question-answer pairs; the split quirk in its files verified directly, not assumed</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (baseline), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Baseline training</td><td class="scope">Elementwise fusion, 10 epochs, about 73 minutes. 72.74% overall / 75.16% average accuracy on the held-out test split</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Cross-attention experiment</td><td class="scope">First attempt failed (design flaw, found and fixed — see §05). Corrected version: 72.33% overall / 72.29% average, about 90 minutes to train</td><td><span class="pill live">Done</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3>Web app track — complete, and how the model is demonstrated</h3>
+        <p>A real backend and interface, not a throwaway. Built first for the backend
+          modules, then completed once the trained model existed. It shows both models'
+          answers side by side.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="modules">
+          <thead>
+            <tr><th>Module</th><th>Scope</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="num">M01</td><td><span class="name">Authentication</span><br><span class="scope">Accounts, roles, audit trail — Argon2id hashing, single-use refresh tokens, role-based access</span></td><td><span class="pill live">Complete</span></td></tr>
+            <tr><td class="num">M02</td><td><span class="name">Image management</span><br><span class="scope">Upload TIFF/PNG/JPG, content-checked rather than trusted by extension, geo-metadata extraction, thumbnails</span></td><td><span class="pill live">Complete</span></td></tr>
+            <tr><td class="num">M03/4</td><td><span class="name">Model serving</span><br><span class="scope">Ask a question about an image; both trained models answer together, with confidence and runner-up answers. About 0.4 s per question per model on a laptop CPU</span></td><td><span class="pill live">Complete</span></td></tr>
+            <tr><td class="num">M05</td><td><span class="name">Frontend</span><br><span class="scope">Sign-in, image library with drag-and-drop upload, a workspace with side-by-side answers, question history; works at phone width</span></td><td><span class="pill live">Complete</span></td></tr>
+            <tr><td class="num">M06</td><td><span class="name">Map view</span><br><span class="scope">Georeferenced scenes drawn at their true location over dark or satellite basemaps</span></td><td><span class="pill live">Complete</span></td></tr>
+            <tr><td class="num">M07</td><td><span class="name">Dashboard</span><br><span class="scope">Both models' measured accuracy by question type, with live usage figures</span></td><td><span class="pill live">Complete</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <p>111 backend tests and 5 model tests pass, plus an architecture test that fails
+          the build if the layering rule is ever violated. There's a one-command demo
+          launcher and a written runbook with a walkthrough script and the test images
+          that work best.</p>
+      </div>
+    </section>
+
+    <section id="results">
+      <span class="eyebrow">05 — The numbers, and how to read them</span>
+      <h2>The results</h2>
+      <div class="prose">
+        <p class="lead">Measured on RSVQA-LR's official held-out test split — 9,838
+          questions the models never saw during training. Each model was trained once.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="compare">
+          <thead>
+            <tr><th>Test accuracy</th><th class="num">Baseline (elementwise)</th><th class="num">Cross-attention</th><th class="num">No image (guess)</th><th class="num">Test questions</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Overall</td><td class="num win">72.74%</td><td class="num">72.33%</td><td class="num">70.42%</td><td class="num">9,838</td></tr>
+            <tr><td>Average (paper's metric)</td><td class="num win">75.16%</td><td class="num">72.29%</td><td class="num">64.84%</td><td class="num">—</td></tr>
+            <tr><td>Rural / urban</td><td class="num win">92.0%</td><td class="num">81.0%</td><td class="num">56.0%</td><td class="num">100</td></tr>
+            <tr><td>Presence</td><td class="num win">90.7%</td><td class="num">90.2%</td><td class="num">88.3%</td><td class="num">2,955</td></tr>
+            <tr><td>Comparison</td><td class="num win">90.4%</td><td class="num">89.2%</td><td class="num">87.1%</td><td class="num">4,002</td></tr>
+            <tr><td>Counting</td><td class="num">27.5%</td><td class="num win">28.8%</td><td class="num">28.0%</td><td class="num">2,781</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3>How to read it honestly</h3>
+        <p><strong>The two are effectively tied.</strong> Overall they differ by 0.4 points,
+          about 40 questions out of 9,838. The bigger gap in <em>average</em> accuracy
+          (3 points) comes almost entirely from rural/urban: it has only 100 test
+          questions, but the average weights it as a quarter of the score, so the baseline
+          getting 11 more of them right moves the average by nearly 3 points. On the three
+          large categories the models are within about 1.3 points either way, with
+          cross-attention slightly ahead on counting.</p>
+        <p><strong>What you can and can't claim.</strong> You can say cross-attention did not
+          measurably improve on the baseline in this setup, at about 13% more parameters.
+          You can't say the baseline is better — the difference is inside what one training
+          run can't distinguish. Counting is weak for both (about 28%), consistent with it
+          being the hardest question type for small VQA models generally.</p>
+        <p><strong>Against the paper.</strong> The paper reports 64.61%; your baseline is
+          higher, but it trained on a much larger dataset (RSVQAxBEN, ~15M examples) and you
+          trained on RSVQA-LR directly, so it isn't like-for-like. Don't claim to have
+          beaten it.</p>
+
+        <h3>What the image actually adds — the number to know</h3>
+        <p>A predictor that <strong>never looks at the image</strong> and answers each question with
+          the most common training answer to that exact question scores <strong>70.42% overall</strong>
+          — because RSVQA-LR's questions are templated. So both models beat it by only about two
+          points. The image clearly matters for rural/urban (56% → 92% and 81%), adds a little on
+          presence and comparison, and adds <strong>nothing on counting</strong>: both models are
+          level with always saying "0". This is a known weakness of templated benchmarks, not of
+          your implementation — but it is the honest floor to judge the models against, and an
+          examiner may well ask. The dashboard shows it as a grey bar, and
+          <code>ml/scripts/question_only_baseline.py</code> reproduces it in one command.</p>
+
+        <h3>The first cross-attention attempt — the story to tell</h3>
+        <div class="callout">
+          <p><strong>What happened:</strong> the first run scored 36.06% overall (27.07%
+            average), with rural/urban and counting both at exactly zero. Its validation
+            accuracy sat on the same one or two values from epoch 0 to epoch 9 and the
+            training loss never moved. That is the signature of a model giving nearly the
+            same answer whatever it's asked.</p>
+          <p><strong>The cause:</strong> a design bug of mine. I had squashed the image and
+            the question to one vector each before the attention step, so attention ran
+            over a single item — and softmax over one item is always exactly 1. The
+            question had zero influence on the output. I proved it: changing the question
+            changed the output by exactly 0.0, while changing the image changed it by 0.84.</p>
+          <p><strong>The fix:</strong> keep both as sequences, so every question word
+            attends over all image patches. Retrained: 36% → 72%. I also made the model
+            choose its fusion in one place (three scripts had each swapped it in by hand,
+            which is how it went unnoticed) and added an automated test that both the
+            question and the image must change a fusion module's output.</p>
+          <p><strong>Why tell it:</strong> a run that finishes without errors isn't proof the
+            model works. Finding, proving and fixing this from a flat training curve shows
+            you understand the model, not just the tooling.</p>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="demo">
+      <span class="eyebrow">06 — Do this on stage</span>
+      <h2>Live demo script</h2>
+      <div class="prose">
+        <p class="lead">Every question below was run through both models on this machine. The
+          demo leads with the one kind of question where the image, not the wording, decides the
+          answer.</p>
+
+        <h3>Ten minutes before</h3>
+        <ol class="plain">
+          <li>Plug in; close heavy programs (the models run on the CPU). Be on the internet for
+            the map.</li>
+          <li>In PowerShell, from the project folder, run <code>.\scripts\dev.ps1 demo</code>. Wait
+            for the sign-in page, sign in, and check the top-right says
+            <strong>"2 of 2 models online"</strong>.</li>
+          <li>Have three files ready from <code>ml/dataset/rsvqa_lr/images/Images_LR/</code>:
+            <code>243.tif</code> (urban), <code>246.tif</code> (rural), <code>315.tif</code>
+            (farmland). All are from the held-out test set. Spares: <code>237.tif</code> (urban),
+            <code>235.tif</code> (rural).</li>
+        </ol>
+
+        <h3>The walkthrough (about 6 minutes)</h3>
+        <ol class="plain">
+          <li><strong>What it is (30 s).</strong> "Upload a satellite image, ask a question in plain
+            English, and two small models answer side by side — a published baseline and the
+            architecture I built to compare against it."</li>
+          <li><strong>Upload (30 s).</strong> Drag in <code>243.tif</code>. Point at the metadata:
+            size, resolution, coordinate system, location. "It reads the GeoTIFF's own geo
+            information, so the image knows where on Earth it is."</li>
+          <li><strong>Urban vs. rural (2 min).</strong> Open 243, click the chip "Is it a rural or
+            an urban area?" → both say <em>urban</em>. Upload 246, same question → both say
+            <em>rural</em>. "Same question, two images, two answers — it's reading the picture,
+            not just the words."</li>
+          <li><strong>A few more (1 min).</strong> On 315: presence and comparison questions. Say
+            plainly: "these are easier — on this dataset the wording alone gets them right most of
+            the time."</li>
+          <li><strong>Map (45 s).</strong> The scene at its real location; toggle Dark / Satellite;
+            click the footprint to jump back to the question workspace.</li>
+          <li><strong>Dashboard (1 min).</strong> The accuracy bars: teal baseline, amber
+            cross-attention, grey no-image guess. "The two models tie. The grey bar is what you get
+            by not looking at the image at all — so the image adds about two points overall, and a
+            lot on urban-versus-rural."</li>
+        </ol>
+      </div>
+
+      <div class="table-wrap">
+        <table class="compare">
+          <caption style="text-align:left;font-size:0.8rem;color:var(--ink-faint);margin-bottom:0.6rem">Verified with both models on this machine (baseline / cross-attention confidence).</caption>
+          <thead><tr><th>Image</th><th>Question</th><th>True answer</th><th>Both models say</th></tr></thead>
+          <tbody>
+            <tr><td>243.tif</td><td>Is it a rural or an urban area?</td><td>urban</td><td>urban (98% / 97%)</td></tr>
+            <tr><td>246.tif</td><td>Is it a rural or an urban area?</td><td>rural</td><td>rural (100% / 100%)</td></tr>
+            <tr><td>315.tif</td><td>Is a cemetery present?</td><td>yes</td><td>yes (100% / 100%)</td></tr>
+            <tr><td>315.tif</td><td>Is there a rectangular road?</td><td>no</td><td>no (100% / 99%)</td></tr>
+            <tr><td>315.tif</td><td>Are there less roads than residential buildings in the image?</td><td>yes</td><td>yes (98% / 92%)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3>Avoid, and why</h3>
+        <ul class="plain">
+          <li><strong>Counts above zero</strong> ("How many buildings are there?"). Counting is the
+            weak spot: both models are no better than always answering the most common count
+            (about 28%). If someone asks, say so and point at the dashboard.</li>
+          <li><strong>Open-ended questions</strong> ("describe this"). The models pick from a fixed
+            list of 1,000 answers. The app shows a low-confidence warning when it's close to
+            guessing.</li>
+        </ul>
+
+        <h3>If something goes wrong</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="modules">
+          <thead><tr><th>Symptom</th><th>Do this</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Pill says "1 of 2" or "no models"</td><td class="scope">A checkpoint is missing from <code>backend/checkpoints/</code> (needs both <code>xcit_nano_*_epoch9.pt</code> and <code>answer_vocab.json</code>). One model still works — say so and continue.</td></tr>
+            <tr><td class="name">Blank page / can't sign in</td><td class="scope">A launcher window was closed. Run <code>.\scripts\dev.ps1 demo</code> again.</td></tr>
+            <tr><td class="name">Map is grey</td><td class="scope">No internet for the tiles. Skip the map.</td></tr>
+            <tr><td class="name">A model answers wrong on stage</td><td class="scope">Don't hide it. "That's a real mistake — look at the confidence. That's why I report accuracy on thousands of questions, not one example."</td></tr>
+            <tr><td class="name">Answers look random, confidence under 1%</td><td class="scope">An early stand-in checkpoint is loaded. Check the file names in <code>backend/checkpoints/</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="numbers">
+      <span class="eyebrow">07 — Memorise these</span>
+      <h2>The numbers cheat-sheet</h2>
+      <div class="prose"><p class="lead">Only facts measured or documented in this project. Read them aloud twice.</p></div>
+      <div class="table-wrap">
+        <table class="facts">
+          <tbody>
+            <tr><th colspan="2">Data — RSVQA-LR (Lobry et al., 2020)</th></tr>
+            <tr><td>Images</td><td class="v">772 · 256 × 256 px · Sentinel-2 over the Netherlands</td></tr>
+            <tr><td>Question–answer pairs</td><td class="v">77,232 total</td></tr>
+            <tr><td>Splits</td><td class="v">57,223 train / 10,005 val / 10,004 test</td></tr>
+            <tr><td>Test set actually used</td><td class="v">9,838 (166 dropped: answer not in the 1,000 most common training answers)</td></tr>
+            <tr><td>Question types (test count)</td><td class="v">comparison 4,002 · presence 2,955 · counting 2,781 · rural/urban 100</td></tr>
+
+            <tr><th colspan="2">Model</th></tr>
+            <tr><td>Image encoder</td><td class="v">XCiT-Nano, pretrained (ImageNet) · 197 × 128 output</td></tr>
+            <tr><td>Text encoder</td><td class="v">BERT-Tiny (Google) · 2 layers, 128 wide, 2 heads</td></tr>
+            <tr><td>Fusion / classifier</td><td class="v">512 wide · classifier 512 hidden, dropout 0.25, 1,000 outputs</td></tr>
+            <tr><td>Parameters</td><td class="v">8,217,896 baseline (paper: 8.1M) · 9,269,544 cross-attention</td></tr>
+
+            <tr><th colspan="2">Training</th></tr>
+            <tr><td>Optimiser, rate</td><td class="v">AdamW, 5e-4 (the paper's value), same for both models</td></tr>
+            <tr><td>Batch, epochs</td><td class="v">64 (paper: 512 — ran out of memory on the ~10 GB slice) · 10 epochs</td></tr>
+            <tr><td>Hardware</td><td class="v">one 1g.10gb slice of an A100 (80 GB), SLURM</td></tr>
+            <tr><td>Time</td><td class="v">baseline ~73 min · cross-attention ~91 min</td></tr>
+            <tr><td>Validation accuracy</td><td class="v">baseline 72.0% after epoch 0, ~73–74% after — it plateaued early</td></tr>
+
+            <tr><th colspan="2">Results — held-out test split</th></tr>
+            <tr><td>Baseline (elementwise)</td><td class="v">72.74% overall · 75.16% average</td></tr>
+            <tr><td>Cross-attention</td><td class="v">72.33% overall · 72.29% average</td></tr>
+            <tr><td>No image at all</td><td class="v">70.42% overall · 64.84% average</td></tr>
+            <tr><td>By type: baseline / cross / no-image</td><td class="v">rural-urban 92.0 / 81.0 / 56.0 · presence 90.7 / 90.2 / 88.3 · comparison 90.4 / 89.2 / 87.1 · counting 27.5 / 28.8 / 28.0</td></tr>
+            <tr><td>The failed first attempt</td><td class="v">36.06% overall · 27.07% average</td></tr>
+            <tr><td>Paper (different dataset)</td><td class="v">64.61% average — not like-for-like</td></tr>
+
+            <tr><th colspan="2">System</th></tr>
+            <tr><td>Speed</td><td class="v">~0.4 s per question per model, laptop CPU</td></tr>
+            <tr><td>Tests</td><td class="v">111 backend + 5 model tests, all passing</td></tr>
+            <tr><td>Stack</td><td class="v">FastAPI · SQLAlchemy · SQLite (PostgreSQL-ready) · Next.js 16 · Tailwind · Leaflet</td></tr>
+
+            <tr><th colspan="2">Timeline</th></tr>
+            <tr><td>Late Aug 2026</td><td class="v">started, with the original large-model plan</td></tr>
+            <tr><td>Early Sep</td><td class="v">guide's review → pivot to training a small model</td></tr>
+            <tr><td>8 Sep</td><td class="v">baseline trained and evaluated on the HPC</td></tr>
+            <tr><td>17 Sep</td><td class="v">first cross-attention run: 36%</td></tr>
+            <tr><td>21 Sep</td><td class="v">bug found and fixed, retrained (72.3%); frontend, map, dashboard, report, demo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decisions">
+      <span class="eyebrow">08 — The "why," not just the "what"</span>
+      <h2>Why this plan, and why these specific choices</h2>
+      <div class="prose">
+        <p class="lead">A guide asking "why" is testing whether you understand the
+          decisions or just followed a tutorial. Each of these has a one-line reason —
+          lead with that, then expand only if asked.</p>
+
+        <h3>Why the plan changed at all</h3>
+        <p>Say this one plainly, it reflects well on you: the original plan called an
+          existing vision-language model through an API and built a verification layer
+          on top of it. Your guide reviewed that and said the model itself — training one
+          and understanding its internals — is the actual point of the project, not the
+          web app around it. The plan changed because that's the right call, not because
+          the earlier work was wasted: the web app became the delivery layer for the
+          trained model.</p>
+
+        <h3>Why LiT-4-RSVQA specifically</h3>
+        <p>Because it directly answers "can a model this small still be accurate?" — and
+          the paper's own results say yes: 8.1M parameters beating a 277M-parameter
+          baseline by roughly 9 accuracy points, and pretrained-then-fine-tuned beating
+          training-from-scratch by nearly 13 points on the identical architecture. That
+          second number is the reason this project fine-tunes pretrained encoders. It's
+          also realistic for a semester on a shared GPU slice, which a multi-billion-parameter
+          model is not.</p>
+
+        <h3>Why RSVQA-LR, and not a bigger benchmark</h3>
+        <p>Small enough to fully train and evaluate in the time and compute available, and
+          it's the benchmark the paper itself reports on. Richer benchmarks now exist (see
+          §10); moving to one is honest future work, not something overlooked.</p>
+
+        <h3>What the original contribution is</h3>
+        <p>The paper's design is the baseline, reproduced. The experiment is swapping its
+          elementwise fusion for cross-attention on identical data, encoders and training
+          settings, so any difference is attributable to that one change. The result was a
+          tie — a clean negative result, reported as one.</p>
+
+        <h3>Why a layered architecture in the web app</h3>
+        <p>Four layers — domain rules, use cases, infrastructure, API — with inner layers
+          forbidden from depending on outer ones, enforced by a test that fails the build.
+          That's why the database can swap from SQLite to PostgreSQL, or the model runner
+          can change, without touching business logic.</p>
+
+        <h3>Why training ran on the institute HPC</h3>
+        <p>No GPU on the laptop, and CPU training is impractical at this size. The cluster
+          is used through SLURM after a formal declaration form. Everything was written and
+          CPU-verified first so GPU time went to running working jobs. The real cluster
+          still surfaced four problems no laptop could have (the reserved-GPU labelling, a
+          driver/CUDA mismatch and a GPU-slice addressing problem that each made training
+          silently fall back to the CPU, and an out-of-memory error), each diagnosed from
+          the cluster's own output.</p>
+      </div>
+    </section>
+
+    <section id="vqa">
+      <span class="eyebrow">09 — For "do you actually understand VQA"</span>
+      <h2>The VQA background</h2>
+      <div class="prose">
+        <p class="lead">Visual Question Answering: a model is given an image and a
+          question in natural language, and must produce an answer grounded in the image.
+          This project frames it as <strong>classification</strong> — picking the right
+          answer from the 1,000 most frequent in the training set — rather than generating
+          free text. That's a standard framing in this literature, exactly how the original
+          RSVQA benchmark and LiT-4-RSVQA both work, and it's why the app can't answer
+          open-ended "describe this" questions.</p>
+
+        <p>The part worth being able to say clearly: <strong>satellite VQA is not just
+          "VQA on different photos."</strong> It's a different problem, for four concrete
+          reasons.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="compare">
+          <thead>
+            <tr><th></th><th>General VQA (COCO-style photos)</th><th>Remote-sensing VQA</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Viewpoint &amp; scale</td><td>Eye-level, one clear subject fills the frame</td><td>Top-down; a subject can span kilometres or a few pixels</td></tr>
+            <tr><td>Typical question</td><td>"What is this?" — identification</td><td>"How many / how much?" — counting and measurement</td></tr>
+            <tr><td>Training data at scale</td><td>Billions of captioned web photos</td><td>Comparatively small, specialist-labelled datasets — RSVQA-LR is 772 images</td></tr>
+            <tr><td>Vocabulary</td><td>Everyday objects and scenes</td><td>Presence, count, comparison, rural/urban — domain-specific question types</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prose">
+        <h3>How general VQA methods are grouped (Kim et al., 2025)</h3>
+        <p>The survey classifies approaches into three families — worth being able to place
+          this project's models inside it precisely:</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th></th><th>What it does</th><th>Where this project sits</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Joint Embedding</strong></td><td>Embeds image and question into one combined feature, then predicts an answer — no attention deciding what matters before fusion.</td><td>The baseline: elementwise product is a joint-embedding fusion, the same family as the original 2015 VQA model, with modern pretrained encoders.</td></tr>
+            <tr><td><strong>Attention Mechanism</strong></td><td>Learns to focus on the image regions and question words that matter before combining them.</td><td>The cross-attention variant — the experimental step up from the baseline.</td></tr>
+            <tr><td><strong>Model-Agnostic</strong></td><td>Doesn't change the model — fixes the training data, the loss, or adds an ensemble to fight dataset bias.</td><td>Not part of this project's scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="literature">
+      <span class="eyebrow">10 — Name these with confidence</span>
+      <h2>Papers and datasets worth knowing cold</h2>
+      <div class="prose">
+        <p class="lead">The core reading is the two surveys originally assigned —
+          <em>Vision-Language Modeling Meets Remote Sensing</em> (Weng, Pang &amp; Xia,
+          <em>IEEE GRSM</em>, Sept 2025) and <em>Visual Question Answering: A Survey of
+          Methods, Datasets, Evaluation, and Challenges</em> (Kim et al., <em>ACM Computing
+          Surveys</em>, May 2025) — plus the paper this project's architecture follows,
+          and a literature search covering 2024–2026.</p>
+      </div>
+
+      <div class="lit-list">
+        <div class="lit-item">
+          <span class="lit-name">LiT-4-RSVQA</span><span class="lit-tag">Hackel, Clasen, Ravanbakhsh &amp; Demir — TU Berlin, 2023 (arXiv:2306.00758) — the paper this project follows</span>
+          <p>BERT-Tiny text encoder, a lightweight pretrained image transformer (XCiT-Nano,
+            DeiT-Tiny or MobileViT-S), elementwise-product fusion, MLP classifier. Best
+            result — 64.61% average accuracy at 8.1M parameters, beating a 277M-parameter
+            baseline by about 9 points. Its most important number for this project:
+            the same architecture trained from scratch scores only 51.71% — nearly 13 points
+            lower. That's the evidence behind fine-tuning rather than training from zero.</p>
+        </div>
+        <div class="lit-item">
+          <span class="lit-name">RSVQA</span><span class="lit-tag">Lobry, Marcos, Murray &amp; Tuia — IEEE TGRS, Dec 2020</span>
+          <p>The founding benchmark this project trains and evaluates on (the low-resolution
+            split, RSVQA-LR). ResNet-152 + skip-thought vectors, elementwise fusion — the
+            direct ancestor LiT-4-RSVQA is a lightweight successor to.</p>
+        </div>
+        <div class="lit-item">
+          <span class="lit-name">GeoChat</span><span class="lit-tag">Kuckreja et al. — CVPR 2024</span>
+          <p>Useful as contrast, not as a target: CLIP ViT-L/14 → MLP connector →
+            Vicuna-v1.5-7B, fine-tuned with LoRA. Billions of parameters, generates free text
+            rather than classifying. The honest answer to "why not build this" is scale —
+            and that it isn't the depth-of-understanding exercise your guide asked for.</p>
+        </div>
+      </div>
+
+      <div class="prose">
+        <h3>What's moved since 2023 — from a literature search run September 2026</h3>
+        <p>The biggest systems keep getting bigger: <strong>RS-MoE</strong> (Lin et al., 2024)
+          routes between expert LLMs; <strong>Co-LLaVA</strong> (Liu et al., 2025) combines
+          two VLMs and beats GeoChat on RSVQA-LR itself; <strong>HSF-Net</strong> (Liu et
+          al., 2026) adds hierarchical semantic fusion on top of LLaVA. All are
+          billion-parameter systems — good to name for currency, not to chase.</p>
+        <p>One number that backs this project's premise: RS-MoE's 1B-parameter variant
+          performs comparably to 13B-parameter VLMs — current, independent evidence that a
+          small, efficient model can compete with much larger ones.</p>
+        <p>On benchmarks: <strong>EarthVQANet</strong> (Wang et al., 2024) describes RSVQA as
+          covering "basic statistics for general objects," and the much larger
+          <strong>RSVLM-QA</strong> (Zi et al., 2025 — 162,373 pairs vs. RSVQA-LR's 77,232)
+          has since appeared. This project's scope is intentionally the simpler, established
+          benchmark; richer ones are future work.</p>
+        <p><strong>MQVQA</strong> (Zhang et al., 2023) is directly comparable prior work — a
+          multi-step attention mechanism on the same benchmark family. And
+          <strong>Lu et al.'s 2023 review</strong> of attention in VQA fusion is the citation
+          for why testing cross-attention against the elementwise baseline is a
+          literature-grounded experiment.</p>
+      </div>
+    </section>
+
+
+    <section id="glossary">
+      <span class="eyebrow">11 — Say these in plain words</span>
+      <h2>Glossary</h2>
+      <div class="prose"><p class="lead">Each one is a definition you could say to a friend.</p></div>
+      <dl class="terms">
+        <dt>VQA (visual question answering)</dt><dd>Give a computer a picture and a question in ordinary language; it answers in ordinary language.</dd>
+        <dt>Parameter</dt><dd>One of the adjustable numbers inside a model. Learning means adjusting them. This model has about 8 million; large models have billions.</dd>
+        <dt>Vector</dt><dd>A list of numbers. Models turn pictures and words into vectors so they can compare and combine them.</dd>
+        <dt>Encoder</dt><dd>The part that turns raw input (an image or a sentence) into vectors the rest of the model can use.</dd>
+        <dt>Transformer</dt><dd>A kind of model built around "attention" — letting every piece of the input look at every other piece to decide what matters. XCiT-Nano and BERT-Tiny are both small transformers.</dd>
+        <dt>Patch / token</dt><dd>A small piece of the input: a 16 × 16 square of the image, or a word piece of the question.</dd>
+        <dt>Pretrained / fine-tuned</dt><dd>Pretrained: already taught general skills on other data (ImageNet photos, general text). Fine-tuned: then adjusted on this project's data. The paper found this beats starting from scratch by about 13 points.</dd>
+        <dt>Fusion</dt><dd>The step that combines what the image says with what the question asks.</dd>
+        <dt>Elementwise product</dt><dd>Multiplying two equal-length lists of numbers position by position. The simple fusion in the paper and in the baseline.</dd>
+        <dt>Attention / cross-attention</dt><dd>Attention: scoring how relevant each piece is, then taking a weighted mix. Cross-attention: the question's words score the image's patches, so each word pulls in the regions relevant to it.</dd>
+        <dt>Softmax / confidence</dt><dd>Softmax turns raw scores into probabilities that add to 100%. The top one is the "confidence". A high confidence is not a guarantee of being right.</dd>
+        <dt>Classification framing</dt><dd>Treating the answer as a choice from a fixed list (here, the 1,000 most common answers) instead of writing free text.</dd>
+        <dt>Loss (cross-entropy)</dt><dd>A single number for how wrong the model's guesses are. Training tries to make it smaller.</dd>
+        <dt>Epoch / batch</dt><dd>An epoch is one full pass over the training data. A batch is the handful of examples (64 here) processed before each adjustment.</dd>
+        <dt>Learning rate / AdamW</dt><dd>The learning rate is how big each adjustment is. AdamW is the standard method for deciding the adjustments.</dd>
+        <dt>Train / validation / test</dt><dd>Train: what it learns from. Validation: checked during training to spot memorising. Test: kept untouched until the end for the honest score.</dd>
+        <dt>Overfitting</dt><dd>Doing better on the training data while not improving (or getting worse) on new data — memorising instead of learning.</dd>
+        <dt>Overall vs. average accuracy</dt><dd>Overall: the plain share of questions answered correctly. Average: the mean of the four per-type accuracies, matching the paper. A small type like rural/urban (100 questions) has the same weight as a huge one.</dd>
+        <dt>Baseline</dt><dd>The reference you compare against. Here: the paper's design (elementwise fusion), and separately a "no image" guess.</dd>
+        <dt>Ablation / controlled experiment</dt><dd>Change one thing, keep everything else identical, see what moves. Swapping only the fusion is the project's experiment.</dd>
+        <dt>Language bias / no-image baseline</dt><dd>When the wording of a question already predicts the answer. A predictor that never sees the image and answers by wording alone scores 70.4% here.</dd>
+        <dt>Checkpoint</dt><dd>A saved snapshot of all the model's numbers. The app loads two of them.</dd>
+        <dt>HPC / SLURM / MIG</dt><dd>HPC: the institute's shared GPU cluster. SLURM: the scheduler you submit jobs to. MIG: splitting one big GPU into several smaller, separate slices.</dd>
+        <dt>GeoTIFF / CRS / GSD</dt><dd>GeoTIFF: an image file that also stores where on Earth it is. CRS: the coordinate system used (these files use Web Mercator). GSD: how much ground one pixel covers.</dd>
+      </dl>
+    </section>
+
+    <section id="questions">
+      <span class="eyebrow">12 — Rehearse these out loud once</span>
+      <h2>Questions to expect, and how to answer them</h2>
+
+      <div class="qa">
+        <p class="q">"Did cross-attention beat the baseline?"</p>
+        <p class="a">No — it tied it. 72.3% against 72.7% overall on 9,838 held-out
+          questions. It was slightly better at counting and slightly worse at rural/urban,
+          but that category has only 100 test questions, so I don't read it as a real
+          difference. Each model was trained once, so the honest conclusion is that the
+          richer fusion didn't measurably help here, at about 13% more parameters. Repeating
+          runs with different seeds would be the next step.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Your first cross-attention run scored 36%. What happened?"</p>
+        <p class="a">A bug in my own design. I'd reduced the image and the question to one
+          vector each before attention, so it attended over a single item and softmax gave
+          it a weight of exactly 1 — the question never reached the classifier. I spotted it
+          from a training curve that never moved, proved it by showing the output changed by
+          exactly zero when I changed the question, and fixed it by attending over all image
+          patches. Retraining took it from 36% to 72%, and there's now a test that guards
+          against it.
+          <span class="flag">Lead with what you noticed and how you proved it — the flat curve,
+          the zero — not with the fact that it went wrong.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why is your accuracy higher than the paper's 64.6%?"</p>
+        <p class="a">It isn't a fair comparison, and I don't claim it is. The paper trained
+          on a much larger dataset (RSVQAxBEN, about 15 million examples) and reports on that
+          setting; I trained and tested directly on RSVQA-LR. The number that matters is that
+          my reproduction of their architecture works, and that the parameter count matches
+          (8.2M vs. their 8.1M).</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why not just fine-tune or call an existing model like GeoChat or Qwen2.5-VL?"</p>
+        <p class="a">Two reasons. Scale: those are billion-parameter systems that need far more
+          compute than a shared institute GPU realistically provides in a semester. And
+          you were asked to understand a VQA model's internals, not call an API. A model
+          this size can be trained, tested, debugged and fully explained end to end by one
+          person; a 7B-parameter model can't, at this depth.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"You're following a published paper's architecture. What's actually yours?"</p>
+        <p class="a">The paper's architecture is the baseline, reproduced honestly. The original
+          piece is the cross-attention experiment on top — implemented, debugged, trained and
+          measured against the paper's own baseline on identical data and encoders. I also
+          built the pipeline, the training and evaluation code, the model-serving backend and
+          the interface, and I can explain every component. Using pretrained weights isn't a
+          shortcut around "making your own model" — it's how the field works, and the paper's
+          own numbers show why.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why does a satellite VQA tool need authentication and admin roles?"</p>
+        <p class="a">It was built under the original plan, and it turned out to be the right
+          foundation: uploaded images and question history belong to a user, so the model
+          service needs to know whose data it's touching. It has 111 tests and real security
+          properties — Argon2id hashing, single-use refresh tokens, role-based access.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"You don't have a GPU. How did training happen?"</p>
+        <p class="a">On the institute's HPC cluster through SLURM, after the formal declaration
+          form. Every script was verified on CPU first so the GPU time ran working jobs. Even
+          so, the real cluster exposed four problems no laptop could — the reserved-GPU labelling, a driver/CUDA mismatch and a GPU-slice addressing problem that each silently fell back to the CPU, and an out-of-memory error — each diagnosed from the cluster's own output.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"What happened to the SGV / spectral-verification idea from the original plan?"</p>
+        <p class="a">Set aside when the priority moved to the model itself — checking a model's
+          quantitative claims against spectral measurements doesn't apply the same way to a
+          classifier that picks from a fixed answer list. Whether it returns as a layer later
+          is genuinely open: an idea on hold, not one proven wrong.
+          <span class="flag">A guide respects an owned pivot far more than one glossed over —
+          say plainly that the plan changed and why.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"What are the limits?"</p>
+        <p class="a">It answers from a fixed list of 1,000 answers, so it can't write free text
+          or answer questions outside that vocabulary. Counting is weak (about 28%). It's
+          trained on one region and resolution (Sentinel-2 over the Netherlands), so it may not
+          transfer elsewhere. Each model was trained once. And the test set, RSVQA-LR, is
+          narrower than newer benchmarks like RSVLM-QA.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"How much of that accuracy is just guessing from the question?"</p>
+        <p class="a">A lot of it, and I measured it. A predictor that never sees the image and
+          answers with the most common training answer to each exact question scores 70.4% overall on
+          the test set; my models score 72.7% and 72.3%. So the image adds about two points overall.
+          It clearly matters for rural/urban — 56% without the image, 92% and 81% with it — helps a
+          little on presence and comparison, and doesn't help counting at all. That's a known
+          weakness of templated benchmarks like RSVQA, and it's why I show the no-image bar next to
+          the models on the dashboard.
+          <span class="flag">Lead with it before you're asked. It turns the strongest objection
+          into evidence that you evaluated the result.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why classification instead of generating a sentence?"</p>
+        <p class="a">It's the standard framing for this benchmark and it's what the paper does. It
+          makes accuracy exactly measurable, keeps the model small, and is honest about scope: the
+          model picks from the 1,000 most common answers. The cost is that it can't answer
+          open-ended questions, which I say up front.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why BERT-Tiny and XCiT-Nano?"</p>
+        <p class="a">They're the paper's best small combination: BERT-Tiny is 2 layers and 128
+          numbers wide, XCiT-Nano is a small pretrained image transformer, and together the model is
+          about 8 million parameters. Small enough to train in about an hour on one GPU slice and to
+          run on a laptop CPU, which matters for a live demo.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Explain cross-attention in one breath."</p>
+        <p class="a">"Every word of the question looks across all the little squares of the image,
+          scores how relevant each is to that word, and pulls in a weighted mix of them — so 'road'
+          can focus on road-looking patches — instead of the image and the question each being
+          squashed into one summary and multiplied."</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"How do you know it isn't just memorising the training data?"</p>
+        <p class="a">Two checks. Validation accuracy was scored after every epoch on data it wasn't
+          training on, and the final score is on a separate test set used once. The baseline's
+          training loss fell from 1.42 to 0.91 over ten epochs while validation accuracy stayed at
+          about 73–74% — so after the first epoch it was mostly fitting the training set better, not
+          generalising better, which is why I didn't run longer.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Did you pick the best epoch using the test set?"</p>
+        <p class="a">No. I evaluated the final epoch, once, on the test split. The validation set was
+          only for watching training.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why batch 64, learning rate 5e-4, ten epochs?"</p>
+        <p class="a">The learning rate is the paper's. The paper used batch 512, which ran out of
+          memory on the roughly 10 GB GPU slice I had, so I used 64. I didn't tune anything, and
+          both models use identical settings, which keeps the comparison fair. The catch: batch size
+          differs from the paper, so my baseline isn't an exact replication.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Which number should I quote — overall or average?"</p>
+        <p class="a">Overall means "how often is it right" — 72.7% for the baseline. Average is the
+          mean of the four question types, which is what the paper reports, so use it when comparing
+          to the paper. It's less stable here because rural/urban has only 100 questions but counts
+          as a quarter.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"The app says about 16 m per pixel but Sentinel-2 is 10 m. Which is it?"</p>
+        <p class="a">Sentinel-2's native resolution here is about 10 m. The files are stored in Web
+          Mercator, which stretches distances away from the equator by 1/cos(latitude), and at 51–53°N
+          that turns 10 m into roughly 16–17 m — the app reports 15.8 m at 51.2°N and 16.5 m at
+          52.8°N, which matches. Say it as "the map projection stretches it", not as a data problem.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Would it work on other cities or other satellites?"</p>
+        <p class="a">Untested. It was trained on Sentinel-2 imagery of the Netherlands with templated
+          questions, so I'd expect it to need fine-tuning for other sensors, resolutions or regions.
+          I'd say that plainly rather than guess.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Did you use AI tools to build this?"</p>
+        <p class="a">Answer truthfully and within your institute's rules. If it's accurate for you:
+          "Yes — I used an AI coding assistant for implementation. I made the decisions — the pivot,
+          the model choice, the cross-attention experiment, reporting the tie honestly — and I can
+          explain, run and reproduce every part; I found and diagnosed the cross-attention bug from
+          the training curve." Then prove it by explaining something. Never claim to have hand-written
+          what you didn't.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"What would you do next?"</p>
+        <p class="a">Repeat each run with several random seeds to measure run-to-run noise; move to a
+          larger benchmark such as RSVLM-QA; visualise which patches each word attends to, to see if
+          cross-attention learns something sensible; try to fix counting, which is stuck at the
+          no-image level; and compare against a larger model to put a number on the small-model
+          trade-off.</p>
+      </div>
+    </section>
+
+
+    <section id="ownership">
+      <span class="eyebrow">13 — The part that decides how it goes</span>
+      <h2>What you must be able to do without help</h2>
+      <div class="prose">
+        <p class="lead">A guide grades understanding. A polished result you can't explain scores
+          worse than a modest one you can. Spend most of your preparation here.</p>
+
+        <div class="callout">
+          <p><strong>On AI tools.</strong> This project was built with heavy help from an AI coding
+            assistant. If you're asked, answer truthfully and within your institute's rules — don't
+            claim to have hand-written what you didn't. A defensible position, <em>if it is true for
+            you</em>: "I set the direction — the pivot, the model, the cross-attention experiment,
+            the choice to report the tie honestly — and used an assistant for implementation. I can
+            explain, run and reproduce every part." That last sentence has to be real, which is
+            what the checklist below is for.</p>
+        </div>
+
+        <h3>Eight things to rehearse out loud</h3>
+        <ol class="plain">
+          <li>Draw the pipeline from memory (§03) and say what each box outputs.</li>
+          <li>Explain both fusions in two sentences each.</li>
+          <li>Tell the 36% story in 60 seconds, including the exact cause: attention over one item, softmax gives it weight 1, so the question never affects the output.</li>
+          <li>Read a training curve: flat validation accuracy from epoch 0 means it isn't learning from the question; falling training loss with flat validation accuracy means it has plateaued or is starting to memorise.</li>
+          <li>Explain overall vs. average accuracy, and why 11 rural/urban questions moved the average by about 3 points.</li>
+          <li>Explain the no-image baseline and what it means for the results.</li>
+          <li>Run the demo from a cold start, and recover from the three failures in §06.</li>
+          <li>Open the key files below and say what each does.</li>
+        </ol>
+
+        <h3>Where things are, if Ashish asks to see code</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="modules">
+          <thead><tr><th>File</th><th>What it is</th></tr></thead>
+          <tbody>
+            <tr><td class="name"><code>ml/models/vqa_model.py</code></td><td class="scope">The model: both encoders, both fusions, the classifier</td></tr>
+            <tr><td class="name"><code>ml/scripts/train.py</code></td><td class="scope">The training loop: AdamW, cross-entropy, validation each epoch, saves checkpoints</td></tr>
+            <tr><td class="name"><code>ml/scripts/evaluate.py</code></td><td class="scope">Test-set scoring and per-type accuracy</td></tr>
+            <tr><td class="name"><code>ml/dataset/rsvqa_lr_dataset.py</code></td><td class="scope">Data loading, the split quirk, the 1,000-answer vocabulary</td></tr>
+            <tr><td class="name"><code>ml/scripts/question_only_baseline.py</code></td><td class="scope">The no-image floor, reproducible in one command</td></tr>
+            <tr><td class="name"><code>ml/tests/test_fusion.py</code></td><td class="scope">Guards against the single-token bug: both question and image must change the output</td></tr>
+            <tr><td class="name"><code>ml/slurm/*.sbatch</code></td><td class="scope">The cluster job scripts</td></tr>
+            <tr><td class="name"><code>backend/app/infrastructure/vqa/model_runner.py</code></td><td class="scope">Loads both checkpoints and runs predictions</td></tr>
+            <tr><td class="name"><code>backend/app/application/vqa_service.py</code></td><td class="scope">The "ask a question" use case: ownership check, run models, save, audit</td></tr>
+            <tr><td class="name"><code>backend/tests/test_architecture.py</code></td><td class="scope">Fails the build if the layering rule is broken</td></tr>
+            <tr><td class="name"><code>frontend/src/app/(app)/images/[id]/page.tsx</code></td><td class="scope">The question workspace</td></tr>
+            <tr><td class="name"><code>frontend/src/lib/results.ts</code></td><td class="scope">The numbers shown on the dashboard</td></tr>
+            <tr><td class="name"><code>docs/03-demo-runbook.md</code></td><td class="scope">The demo script and fixes, in the repo</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="prose">
+        <h3>A study order</h3>
+        <p>For how each component works from first principles, read the
+          <a href="https://claude.ai/code/artifact/5bfca91a-3a98-41ba-87b5-e79441ab1a65">VQA Model Internals</a>
+          study notes. Then: one session on §03 and §11 until you can draw and explain the
+          pipeline; one on §05, §07 and the failed-attempt story; one on rehearsing §06 twice and
+          answering §12 out loud. About three focused sessions.</p>
+      </div>
+    </section>
+
+    <section id="unknown">
+      <span class="eyebrow">14 — The most important paragraph on this page</span>
+      <h2>If you're asked something you genuinely don't know</h2>
+      <div class="prose">
+        <p>Say so, specifically. "I haven't tested that — I'd need to run it on the held-out
+          set" is a completely credible answer, and far safer than guessing and being caught
+          on a follow-up. The one thing to avoid is a vague deflection ("yeah, that's mostly
+          done") that invites exactly the follow-up you can't answer. A precise "not tested,
+          here's how I would" reads as someone in control of their own scope — and this
+          project has the results and the honest edges to back that up.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Living reference, not a final script. Updated 2026-09-21 as the full presenter's guide, with the trained results
+  (baseline 72.74% / 75.16%, cross-attention 72.33% / 72.29% on the RSVQA-LR test split),
+  the account of the failed first cross-attention run, and the completed web app. The
+  literature section is grounded in a read of both originally-assigned surveys — Weng,
+  Pang &amp; Xia (<em>IEEE GRSM</em>, Sept 2025) and Kim et al. (<em>ACM Computing
+  Surveys</em>, May 2025) — plus Hackel et al. (arXiv:2306.00758) and a literature search
+  run September 2026; page-level detail is worth re-checking before citing it aloud.
+</footer>
+
+</body>
+</html>
