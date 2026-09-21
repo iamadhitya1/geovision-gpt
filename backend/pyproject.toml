@@ -27,11 +27,13 @@ dependencies = [
     # this package's own dependencies (see ml/pyproject.toml), so training and serving
     # can never silently drift onto two different architectures. Resolved to ../ml via
     # [tool.uv.sources] below, uv's supported mechanism for a local path dependency.
+    # Editable on purpose: a plain path dependency installs a frozen COPY of ml/, so model
+    # changes silently never reached the app (the cross-attention fix didn't, at first).
     "geovisiongpt-model",
 ]
 
 [tool.uv.sources]
-geovisiongpt-model = { path = "../ml" }
+geovisiongpt-model = { path = "../ml", editable = true }
 
 [project.optional-dependencies]
 dev = [
