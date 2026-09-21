@@ -11,7 +11,7 @@ A 6–8 minute walkthrough of GeoVisionGPT, plus what to do when something goes 
    .\scripts\dev.ps1 demo
    ```
 
-   This applies database migrations, starts the backend (`:8000`), builds and serves the
+   This starts the backend (`:8000`), builds and serves the
    frontend (`:3000`), and opens the browser. Wait until the browser shows the sign-in page.
 3. Sign in with an account you created beforehand. Check the top-right pill says
    **"2 of 2 models online"**. If it says 1 or 0, see *If something breaks* below.

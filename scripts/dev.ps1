@@ -59,14 +59,16 @@ switch ($Task) {
     'format'   { Invoke-Py @('-m', 'ruff', 'format', '.') }
     'types'    { Invoke-Py @('-m', 'mypy', 'app') }
     'demo' {
-        # Everything a live demo needs: database up to date, backend, a production-mode
+        # Everything a live demo needs: backend (creates its own SQLite tables), a production-mode
         # frontend (no first-visit compile pauses, unlike `npm run dev`), and the browser.
         $Frontend = Join-Path $PSScriptRoot '..\frontend' | Resolve-Path
         $Checkpoints = Join-Path $Backend 'checkpoints'
         if (-not (Test-Path (Join-Path $Checkpoints 'answer_vocab.json'))) {
             Write-Warning "No answer_vocab.json in $Checkpoints - questions will fail until the trained checkpoints are copied there (see ml/README.md)."
         }
-        Invoke-Py @('-m', 'alembic', 'upgrade', 'head')
+        # No `alembic upgrade` here on purpose: the default SQLite profile creates any missing
+        # tables itself at startup, and alembic refuses a database it didn't create ("table
+        # users already exists"). Migrations are for the PostgreSQL profile.
         # Child windows inherit GVG_SECRET_KEY from this session.
         Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Backend'; & '$Python' -m uvicorn app.main:app --port 8000"
         Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Frontend'; npm run build; npm run start"
