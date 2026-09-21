@@ -50,6 +50,24 @@ Run it locally with `uvicorn app.main:app` in [`backend/`](backend) and `npm run
 app still starts and reports "no models loaded"; copy the `.pt` files and
 `answer_vocab.json` down from the HPC to enable questions.
 
+## Getting the trained models (backup and restore)
+
+The trained checkpoints (about 68 MB) are deliberately **not** in git. They are attached to this
+repository's GitHub release `v1.0-trained-models`, together with the answer vocabulary and a copy of
+the project report. To restore them into a fresh clone:
+
+```bash
+gh release download v1.0-trained-models --dir backend/checkpoints \
+  --pattern "*.pt" --pattern "answer_vocab.json"
+```
+
+The original copies are also on the HPC cluster, in `~/geovision-gpt-ml/checkpoints/`. To retrain
+from scratch instead, see [`ml/README.md`](ml/README.md). The downloaded dataset (RSVQA-LR, about
+150 MB) is not stored here either; `ml/README.md` explains where to fetch it.
+
+Note: this repository is private. It names the institute in a few places (this README, the ml
+README, the report generator), so remove those first if you ever make it public.
+
 ## Quick start (no Docker, no GPU required)
 
 ```bash
