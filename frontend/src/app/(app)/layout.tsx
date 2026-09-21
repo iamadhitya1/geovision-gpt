@@ -7,7 +7,10 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import type { FusionType } from "@/lib/types";
 
-const NAV = [{ href: "/images", label: "Library" }];
+const NAV = [
+  { href: "/images", label: "Library" },
+  { href: "/map", label: "Map" },
+];
 
 function ModelStatus() {
   const [fusions, setFusions] = useState<FusionType[] | null>(null);
