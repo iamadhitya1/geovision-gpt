@@ -71,6 +71,21 @@ dashboard shows this as a grey "no image" bar. The image clearly matters for rur
 examiner does — it's a known weakness of templated benchmarks like RSVQA, and stating it shows
 you evaluated the result rather than just reporting it.
 
+## Trying your own image
+
+Any `.tif`, `.png` or `.jpg` uploads. A GeoTIFF with a coordinate system also appears on the map;
+a PNG/JPG works for questions but has no location. Tested here: the same scene re-saved as PNG or
+JPEG gives the same answers, and a larger picture is resized automatically.
+
+**It is only reliable on imagery that looks like its training data**: Sentinel-2-style RGB at
+about 10 m per pixel, a scene roughly 2.5 km across (the dataset's 256 × 256 tiles). Scale
+matters a lot. In a test, a 2× zoomed crop of an urban scene flipped both models' answer from
+*urban* to *rural* at 95–99% confidence, and confidence is not the same as being right. Google
+Earth or Maps screenshots (far finer than 10 m per pixel) are the most likely to mislead. Word
+questions like the dataset's ("Is there a road?", "Are there more buildings than roads?", "Is it
+a rural or an urban area?"); free-form wording is answered as its nearest template. There is no
+ground truth for your own images, so treat results as illustration, not measurement.
+
 ## Questions to avoid on stage
 
 - **Counts above zero** ("How many buildings are there?"). Counting is the weakest category
