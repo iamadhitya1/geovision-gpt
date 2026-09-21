@@ -81,3 +81,12 @@ export interface Page<T> {
   offset: number;
   limit: number;
 }
+
+export interface VqaStats {
+  total_questions: number;
+  sample_size: number;
+  images_queried: number;
+  by_fusion: { fusion: FusionType; answered: number; mean_confidence: number }[];
+  agreement: { compared: number; agreed: number };
+  recent: VqaQuery[];
+}

@@ -10,6 +10,7 @@ import type { FusionType } from "@/lib/types";
 const NAV = [
   { href: "/images", label: "Library" },
   { href: "/map", label: "Map" },
+  { href: "/dashboard", label: "Dashboard" },
 ];
 
 function ModelStatus() {

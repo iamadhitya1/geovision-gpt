@@ -6,6 +6,7 @@ import type {
   TokenPair,
   User,
   VqaQuery,
+  VqaStats,
 } from "./types";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -155,6 +156,8 @@ export const api = {
   },
 
   deleteImage: (id: string) => request<{ message: string }>(`/images/${id}`, { method: "DELETE" }),
+
+  stats: () => request<VqaStats>("/vqa/stats"),
 
   fusions: () => request<FusionType[]>("/vqa/fusions"),
 
