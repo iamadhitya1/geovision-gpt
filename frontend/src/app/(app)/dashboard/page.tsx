@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { FUSION_ORDER, MODEL_INFO, formatConfidence } from "@/lib/models";
-import { QUESTION_TYPES, RESULTS, TEST_SET_SIZE } from "@/lib/results";
+import { QUESTION_ONLY, QUESTION_TYPES, RESULTS, TEST_SET_SIZE } from "@/lib/results";
 import type { VqaStats } from "@/lib/types";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -17,8 +17,15 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-function AccuracyBar({ value, fusion }: { value: number | null; fusion: keyof typeof MODEL_INFO }) {
-  const info = MODEL_INFO[fusion];
+// "question_only" is the no-image reference row: drawn neutral so it reads as a floor, not a model.
+function AccuracyBar({
+  value,
+  fusion,
+}: {
+  value: number | null;
+  fusion: keyof typeof MODEL_INFO | "question_only";
+}) {
+  const info = fusion === "question_only" ? { bg: "bg-muted/60" } : MODEL_INFO[fusion];
   return (
     <div className="flex items-center gap-3">
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-raised">
@@ -70,7 +77,20 @@ function Benchmark() {
           })}
         </div>
 
-        <div className="space-y-4 border-t border-line pt-5">
+        <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-4 font-mono text-[11px] text-muted">
+          {FUSION_ORDER.map((f) => (
+            <span key={f} className="flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${MODEL_INFO[f].bg}`} />
+              {MODEL_INFO[f].name}
+            </span>
+          ))}
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-muted/60" />
+            No image: answer by question text alone
+          </span>
+        </div>
+
+        <div className="space-y-4">
           {QUESTION_TYPES.map((t) => (
             <div key={t.key} className="grid gap-1 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-4">
               <div>
@@ -83,6 +103,7 @@ function Benchmark() {
                 {FUSION_ORDER.map((f) => (
                   <AccuracyBar key={f} fusion={f} value={RESULTS[f]?.byType[t.key] ?? null} />
                 ))}
+                <AccuracyBar fusion="question_only" value={QUESTION_ONLY.byType[t.key]} />
               </div>
             </div>
           ))}
@@ -101,6 +122,14 @@ function Benchmark() {
           ) : (
             <p>The cross-attention numbers appear here as soon as its evaluation finishes.</p>
           )}
+          <p>
+            <span className="text-text">How much does the image add?</span> A predictor that never
+            looks at the image and just answers each question with its most common training answer
+            already scores {QUESTION_ONLY.overall.toFixed(1)}% overall ({QUESTION_ONLY.average.toFixed(1)}%
+            average), because this dataset&apos;s questions are templated. The models beat it by about
+            two points overall: clearly on rural/urban ({QUESTION_ONLY.byType.rural_urban.toFixed(0)}%
+            → 92% and 81%), slightly on presence and comparison, and not at all on counting.
+          </p>
           <p>
             Counting is the hard case for every model of this size. The published LiT-4-RSVQA paper
             reports 64.6%, but it trained on a much larger dataset, so that comparison is indicative,

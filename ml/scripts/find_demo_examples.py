@@ -5,7 +5,7 @@ Only the held-out *test* split is used, so nothing shown was seen in training. T
 also lists confident WRONG answers per image: knowing those in advance is as useful as the
 good ones (you avoid them on stage, and can explain them if asked).
 
-    python scripts/find_demo_examples.py --checkpoint ../backend/checkpoints/xcit_nano_elementwise_epoch9.pt
+    python scripts/find_demo_examples.py --checkpoint CHECKPOINT.pt [--fusion cross_attention]
 """
 
 from __future__ import annotations
@@ -35,7 +35,9 @@ VOCAB_PATH = DATA_ROOT / "answer_vocab.json"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--fusion", choices=["elementwise", "cross_attention"], default="elementwise")
+    parser.add_argument(
+        "--fusion", choices=["elementwise", "cross_attention"], default="elementwise"
+    )
     parser.add_argument("--images", type=int, default=40, help="how many test images to sample")
     parser.add_argument("--per-image", type=int, default=16, help="questions sampled per image")
     parser.add_argument("--min-confidence", type=float, default=0.6)
@@ -92,8 +94,10 @@ def main() -> None:
                 mark = "WRONG"
             else:
                 continue
-            print(f"  {mark} [{q.question_type:11s}] {q.question}  -> {predicted} ({conf:.0%})"
-                  f"  truth: {q.answer}")
+            print(
+                f"  {mark} [{q.question_type:11s}] {q.question}  -> {predicted} ({conf:.0%})"
+                f"  truth: {q.answer}"
+            )
 
 
 if __name__ == "__main__":

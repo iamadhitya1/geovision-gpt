@@ -30,6 +30,16 @@ export const RESULTS: Record<FusionType, FusionResult | null> = {
   },
 };
 
+// What a predictor that NEVER sees the image scores: for each question, the most common
+// training answer to that exact question text (ml/scripts/question_only_baseline.py).
+// RSVQA-LR's questions are templated, so this is strong — and it is the fair floor: the gap
+// between a model and this row is what the image actually contributes.
+export const QUESTION_ONLY: FusionResult = {
+  overall: 70.42,
+  average: 64.84,
+  byType: { rural_urban: 56.0, presence: 88.3, comp: 87.1, count: 28.0 },
+};
+
 // `n` is the number of test questions of that type. It matters when reading the gaps:
 // rural/urban has only 100, so one model getting 11 more of them right moves that bar by 11
 // points — and, because "average accuracy" weights every type equally, moves the average too.

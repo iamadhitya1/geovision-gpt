@@ -66,6 +66,28 @@ that either fusion is better. The result is: **richer cross-attention fusion did
 improve on the published elementwise baseline in this setup**, at about 13% more parameters.
 Validation accuracy at epoch 9 tells the same story (73.8% vs. 74.1%).
 
+### How much of the accuracy comes from the question alone? (`scripts/question_only_baseline.py`)
+
+RSVQA-LR's questions are templated, so many answers are predictable from the words alone. A
+predictor that **never sees the image** and answers each question with its most common
+*training* answer (for that exact question text) scores, on the same 9,838 test questions:
+
+| | No image | Baseline | Cross-attention |
+|---|---|---|---|
+| Overall | **70.42%** | 72.74% | 72.33% |
+| Average | 64.84% | 75.16% | 72.29% |
+| rural_urban | 56.0% | 92.0% | 81.0% |
+| presence | 88.3% | 90.7% | 90.2% |
+| comp | 87.1% | 90.4% | 89.2% |
+| count | 28.0% | 27.5% | 28.8% |
+
+So the image adds about **2 points overall**. It matters clearly for rural/urban (56% → 92% /
+81%), a little for presence and comparison, and **not at all for counting** — both models are
+level with always answering the most common count. This is a known weakness of templated
+benchmarks like RSVQA, and it is the honest floor to judge the models against, not 0%. It is why
+the dashboard shows a "no image" bar next to each model, and why the live demo leads with
+rural/urban questions, where the image decides the answer.
+
 ### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
 
 Test-split accuracy was **36.06% overall / 27.07% average** against the baseline's

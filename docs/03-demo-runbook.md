@@ -17,7 +17,8 @@ A 6–8 minute walkthrough of GeoVisionGPT, plus what to do when something goes 
    **"2 of 2 models online"**. If it says 1 or 0, see *If something breaks* below.
 4. Have these test images ready in a folder (all from `ml/dataset/rsvqa_lr/images/Images_LR/`,
    all from the held-out **test** split — the models never saw them in training):
-   `243.tif`, `315.tif`, `304.tif`, `237.tif`.
+   `243.tif` (urban), `246.tif` (rural), `315.tif` (farmland). Spares: `237.tif` (urban),
+   `235.tif` (rural).
 5. Have internet on: the map needs live basemap tiles. If the Wi-Fi is unreliable, skip the
    map or show it as a screenshot.
 
@@ -31,14 +32,22 @@ architecture I built to compare against it."
 size, resolution (about 15 m per pixel), coordinate system, location. "It reads the
 GeoTIFF's own geo-information, so the image already knows where on Earth it is."
 
-**3. Ask (2 min).** Open the image and use these, which the baseline answers correctly:
+**3. Ask (2–3 min).** Start with the question where the image decides the answer, so the
+audience sees the models actually look at it. Use the suggestion chip "Is it a rural or an urban
+area?" (checked with both models):
 
-| Question | Expected |
-|---|---|
-| Is there a forest? | yes |
-| Is a road present? | yes |
-| Are there more buildings than roads? | yes |
-| What is the amount of square roads? | 0 |
+| Image | Expected | Both models say |
+|---|---|---|
+| `243.tif` | urban | urban (98% / 97%) |
+| `246.tif` | rural | rural (100% / 100%) |
+
+"Same question, two images, two different answers — so it's reading the picture, not just the
+words." Then, on `315.tif`, show a few presence/comparison questions (both models answer all of
+these correctly): "Is a cemetery present?" → yes; "Is there a rectangular road?" → no; "Are there
+less roads than residential buildings in the image?" → yes.
+
+Be upfront that these last ones are easier: on this dataset a good guess from the question's
+words alone gets them right most of the time (see *The image's real contribution* below).
 
 Point at the answer cards: the answer, the confidence bar, and the runner-up answers. Then
 the agree/disagree line under them: "When the two models disagree, that's the interesting
@@ -52,6 +61,15 @@ held-out test set, broken down by question type; then the live usage figures.
 
 **6. The honest close (1 min).** "Counting is the weak spot for models this small, and the
 dashboard shows it. That's a known limit of the approach, not something I hid."
+
+## The image's real contribution (know this before you're asked)
+
+A predictor that never sees the image and just answers each question with its most common
+training answer scores **70.4% overall** on the test set; the models score 72.7% and 72.3%. The
+dashboard shows this as a grey "no image" bar. The image clearly matters for rural/urban (56% →
+92% / 81%), slightly for presence and comparison, and not at all for counting. Say it before an
+examiner does — it's a known weakness of templated benchmarks like RSVQA, and stating it shows
+you evaluated the result rather than just reporting it.
 
 ## Questions to avoid on stage
 
