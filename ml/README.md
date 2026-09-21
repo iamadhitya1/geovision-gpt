@@ -88,6 +88,44 @@ benchmarks like RSVQA, and it is the honest floor to judge the models against, n
 the dashboard shows a "no image" bar next to each model, and why the live demo leads with
 rural/urban questions, where the image decides the answer.
 
+### Robustness study (`scripts/robustness_eval.py`, 2026-09-21) — the measured weakness
+
+Each held-out test question was asked about the original image and about altered copies. Numbers
+are accuracy, then in brackets the share of answers that stayed the same as for the original image
+(baseline / cross-attention). Brightness, half-resolution, mirroring and rotation do **not** change
+the true answer (directional questions like "on the left of" are skipped for mirroring/rotation);
+zoom can, so read its "unchanged" figure rather than its accuracy.
+
+**Rural/urban (100 questions — where the image matters most; a no-image guess scores 56%)**
+
+| Change | Baseline | Cross-attention |
+|---|---|---|
+| Original | 92% | 81% |
+| Darker (×0.6) | **62%** (68%) | 66% (51%) |
+| Brighter (×1.4) | 88% (94%) | 81% (70%) |
+| Half resolution | **58%** (64%) | 73% (62%) |
+| Mirrored / rotated 90° | 92% / 91% | 79% / 84% |
+| Zoom 1.5× / 2× | 73% / 56% | 86% / 58% |
+
+**Other question types (1,000 questions; ~70% of their accuracy is guessable from the wording)**
+
+| Change | Baseline acc (unchanged) | Cross-attention acc (unchanged) |
+|---|---|---|
+| Original | 71.5% | 72.0% |
+| Darker / brighter | 65.8% (73%) / 69.6% (83%) | 69.8% (78%) / 70.7% (80%) |
+| Half resolution | 70.6% (79%) | 71.8% (81%) |
+| Mirrored / rotated 90° | 72.5% (87%) / 71.8% (87%) | 72.3% (92%) / 72.5% (92%) |
+| Zoom 1.5× / 2× | 70.9% (81%) / 67.0% (74%) | 72.2% (83%) / 70.1% (77%) |
+
+**Reading it:** simply dimming the image drops the baseline's rural/urban accuracy from 92% to 62%,
+and halving its resolution to 58% — close to the 56% of ignoring the image. Answers to the other
+types barely lose accuracy only because most of it never came from the image. But even there,
+**13% of the baseline's answers flip under a mirror or a rotation that cannot change the true
+answer** — a model that understood the scene would flip none. Mirroring and rotation do not hurt
+rural/urban, so the weakness is appearance and scale, not geometry. This is what
+`dataset/augment.py` (brightness/contrast/saturation, resolution loss, and mirror/rotate for
+non-directional questions) and the second, aerial-scale dataset (RSVQA-HR) are meant to fix.
+
 ### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
 
 Test-split accuracy was **36.06% overall / 27.07% average** against the baseline's
