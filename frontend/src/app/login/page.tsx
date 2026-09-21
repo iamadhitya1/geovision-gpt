@@ -90,6 +90,9 @@ export default function LoginPage() {
 
       <section className="flex items-center justify-center px-6 py-12">
         <form onSubmit={onSubmit} className="rise w-full max-w-sm space-y-5">
+          <div className="font-display text-lg font-bold tracking-tight lg:hidden">
+            GeoVision<span className="text-elementwise">GPT</span>
+          </div>
           <div>
             <h2 className="font-display text-2xl font-bold tracking-tight">
               {mode === "signin" ? "Sign in" : "Create an account"}

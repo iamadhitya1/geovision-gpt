@@ -24,7 +24,7 @@ function ModelStatus() {
   const tone = online === 0 ? "text-danger" : online === 1 ? "text-cross" : "text-ok";
   return (
     <div
-      className="flex items-center gap-2 rounded-full border border-line px-3 py-1 font-mono text-xs"
+      className="hidden items-center gap-2 rounded-full border border-line px-3 py-1 font-mono text-xs md:flex"
       title={online === 0 ? "No trained checkpoints are loaded on the server." : fusions.join(", ")}
     >
       <span className={`h-1.5 w-1.5 rounded-full bg-current ${tone}`} />
@@ -55,11 +55,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-ink/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-8 px-5">
+        <div className="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center gap-x-6 gap-y-1 px-5 py-2 sm:gap-x-8 sm:py-0">
           <Link href="/images" className="font-display text-base font-bold tracking-tight">
             GeoVision<span className="text-elementwise">GPT</span>
           </Link>
-          <nav className="flex gap-1">
+          <nav className="order-last flex w-full gap-1 sm:order-none sm:w-auto">
             {NAV.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
