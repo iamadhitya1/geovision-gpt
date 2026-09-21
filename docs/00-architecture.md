@@ -101,9 +101,9 @@ haven't been rewritten yet — treat them as historical, not current.
 | 2 | Image management | `SatelliteImage`, `ImageMetadata` | `ImageService` | MinIO, rasterio reader | `/api/v1/images` |
 | 3 | VQA inference | `VqaQuery`, `VqaAnswer`, `FusionType` | `VqaService` | `TorchVqaModelRunner` (loads both trained checkpoints) | `/api/v1/images/{id}/ask` |
 | 4 | Question/answer API + model comparison | (same as above) | (same as above) | (same as above) | `/api/v1/vqa/fusions`, `/api/v1/images/{id}/vqa` |
-| 5 | Frontend | — | — | Next.js | separate app, not a backend router |
-| 6 | Map view | — | — | Leaflet/OpenLayers, reuses Module 2's metadata | frontend-only |
-| 7 | Usage dashboard | `MetricSnapshot` (planned) | `AnalyticsService` (planned) | SQL aggregation | `/api/v1/analytics` (planned) |
+| 5 | Frontend | — | — | Next.js + Tailwind (`frontend/`) | separate app, not a backend router |
+| 6 | Map view | — | — | Leaflet, reuses Module 2's `bounds_wgs84` | frontend-only |
+| 7 | Dashboard | — (derived from `VqaQuery`) | `VqaService.stats` | `list_recent_by_user` | `/api/v1/vqa/stats` |
 
 ## 4. Repository layout
 
