@@ -347,6 +347,18 @@
   table.facts td:first-child { color: var(--ink-muted); width: 34%; }
   table.facts td.v { font-family: var(--font-mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 
+  ol.journey { list-style: none; margin: 1.6rem 0 0; padding: 0; max-width: 46rem; border-left: 2px solid var(--line-strong); }
+  ol.journey > li { position: relative; padding: 0 0 2.2rem 1.7rem; }
+  ol.journey > li::before { content: ""; position: absolute; left: -8px; top: 0.35rem; width: 14px; height: 14px; border-radius: 50%; background: var(--verified); border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--verified); }
+  ol.journey > li.now::before { background: var(--warn-bg); box-shadow: 0 0 0 1px var(--accent); }
+  ol.journey .when { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); }
+  ol.journey h3 { font-family: var(--font-display); font-size: 1.15rem; margin: 0.2rem 0 0.55rem; }
+  ol.journey ul { padding-left: 1.15rem; margin: 0 0 0.7rem; }
+  ol.journey li li { margin-bottom: 0.3rem; }
+  ol.journey .result { background: var(--surface-sunken); border-left: 2px solid var(--verified); padding: 0.55rem 0.8rem; font-size: 0.92rem; color: var(--ink-muted); border-radius: 2px; max-width: 42rem; }
+  ol.journey li.now .result { border-left-color: var(--accent); }
+  ol.journey .result strong { color: var(--ink); }
+
   footer {
     max-width: 74rem;
     margin: 0 auto;
@@ -381,7 +393,7 @@
       script, the numbers, a glossary, and the questions to expect.
     </p>
     <div class="meta-row">
-      <span>STATUS: MODEL TRAINED &amp; TESTED · WEB APP COMPLETE · DEMO-READY</span>
+      <span>STATUS: MODEL TRAINED &amp; TESTED · WEB APP COMPLETE · DEMO-READY · WIDENING THE MODEL (IN PROGRESS)</span>
       <span>REPO: geovision-gpt</span>
       <span>UPDATED 2026-09-21</span>
     </div>
@@ -393,19 +405,20 @@
     <span class="eyebrow">Contents</span>
     <ol>
       <li><a href="#pitch"><span class="toc-num">01</span>The pitch</a></li>
-      <li><a href="#plan"><span class="toc-num">02</span>Talk lengths &amp; audiences</a></li>
-      <li><a href="#how"><span class="toc-num">03</span>How it works</a></li>
-      <li><a href="#status"><span class="toc-num">04</span>Where it stands</a></li>
-      <li><a href="#results"><span class="toc-num">05</span>The results</a></li>
-      <li><a href="#demo"><span class="toc-num">06</span>Live demo script</a></li>
-      <li><a href="#numbers"><span class="toc-num">07</span>Numbers cheat-sheet</a></li>
-      <li><a href="#decisions"><span class="toc-num">08</span>Why this plan</a></li>
-      <li><a href="#vqa"><span class="toc-num">09</span>The VQA background</a></li>
-      <li><a href="#literature"><span class="toc-num">10</span>Papers to name</a></li>
-      <li><a href="#glossary"><span class="toc-num">11</span>Glossary</a></li>
-      <li><a href="#questions"><span class="toc-num">12</span>Expect these questions</a></li>
-      <li><a href="#ownership"><span class="toc-num">13</span>Do it yourself</a></li>
-      <li><a href="#unknown"><span class="toc-num">14</span>If you don't know</a></li>
+      <li><a href="#journey"><span class="toc-num">02</span>The journey</a></li>
+      <li><a href="#plan"><span class="toc-num">03</span>Talk lengths &amp; audiences</a></li>
+      <li><a href="#how"><span class="toc-num">04</span>How it works</a></li>
+      <li><a href="#status"><span class="toc-num">05</span>Where it stands</a></li>
+      <li><a href="#results"><span class="toc-num">06</span>The results</a></li>
+      <li><a href="#demo"><span class="toc-num">07</span>Live demo script</a></li>
+      <li><a href="#numbers"><span class="toc-num">08</span>Numbers cheat-sheet</a></li>
+      <li><a href="#decisions"><span class="toc-num">09</span>Why this plan</a></li>
+      <li><a href="#vqa"><span class="toc-num">10</span>The VQA background</a></li>
+      <li><a href="#literature"><span class="toc-num">11</span>Papers to name</a></li>
+      <li><a href="#glossary"><span class="toc-num">12</span>Glossary</a></li>
+      <li><a href="#questions"><span class="toc-num">13</span>Expect these questions</a></li>
+      <li><a href="#ownership"><span class="toc-num">14</span>Do it yourself</a></li>
+      <li><a href="#unknown"><span class="toc-num">15</span>If you don't know</a></li>
     </ol>
   </nav>
 
@@ -449,8 +462,190 @@
     </section>
 
 
+
+    <section id="journey">
+      <span class="eyebrow">02 — What was done, in order</span>
+      <h2>The journey, step by step</h2>
+      <div class="prose">
+        <p class="lead">From the first plan to today: what was done at each step, what was decided
+          and why, and what came out of it — including the things that went wrong.</p>
+        <div class="callout">
+          <p><strong>Wording note.</strong> This is written neutrally. Say "I" only where it is true
+            for you — see §14 on how to answer questions about who did what.</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="modules">
+          <caption>At a glance</caption>
+          <thead><tr><th>#</th><th>When</th><th>Milestone</th><th>Headline result</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td class="num">Late Aug</td><td class="name">Original plan; backend modules 1–2</td><td class="scope">Accounts and image handling built and tested</td></tr>
+            <tr><td class="num">2</td><td class="num">Early Sep</td><td class="name">Guide's review → pivot to training a small model</td><td class="scope">New plan: LiT-4-RSVQA, plus a cross-attention experiment</td></tr>
+            <tr><td class="num">3</td><td class="num">Early Sep</td><td class="name">Data and model built, verified on CPU</td><td class="scope">8,217,896 parameters (paper: 8.1M)</td></tr>
+            <tr><td class="num">4</td><td class="num">Early Sep</td><td class="name">Access to the institute's GPU cluster</td><td class="scope">SLURM job scripts written and checked</td></tr>
+            <tr><td class="num">5</td><td class="num">8 Sep</td><td class="name">First GPU session: four cluster problems fixed</td><td class="scope">Training runs on the GPU slice</td></tr>
+            <tr><td class="num">6</td><td class="num">8 Sep</td><td class="name">Baseline trained and tested</td><td class="scope">72.74% overall / 75.16% average</td></tr>
+            <tr><td class="num">7</td><td class="num">Mid Sep</td><td class="name">Model serving in the backend (Module 3/4)</td><td class="scope">Ask a question, get both models' answers</td></tr>
+            <tr><td class="num">8</td><td class="num">17 Sep</td><td class="name">Cross-attention experiment fails</td><td class="scope">36.06% overall — half the baseline</td></tr>
+            <tr><td class="num">9</td><td class="num">21 Sep</td><td class="name">Bug found, proven, fixed; retrained</td><td class="scope">72.33% / 72.29% — tied with the baseline</td></tr>
+            <tr><td class="num">10</td><td class="num">21 Sep</td><td class="name">Frontend, map, dashboard (Modules 5–7)</td><td class="scope">Working live demo, tested at phone width</td></tr>
+            <tr><td class="num">11</td><td class="num">21 Sep</td><td class="name">Honest evaluation: no-image floor, robustness</td><td class="scope">Image adds ~2 points; dimming breaks rural/urban</td></tr>
+            <tr><td class="num">12</td><td class="num">21 Sep</td><td class="name">Backup and documentation</td><td class="scope">Private GitHub repo, restore-tested</td></tr>
+            <tr><td class="num">13</td><td class="num">21 Sep →</td><td class="name">Widening the model (in progress)</td><td class="scope">Second dataset + augmentation; target early Oct</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <ol class="journey">
+        <li>
+          <span class="when">Step 01 · Late August 2026</span>
+          <h3>The original plan, and a solid backend</h3>
+          <ul>
+            <li>Topic set with Dr. Ashish Soni: multi-modal visual question answering on satellite and Earth-observation imagery.</li>
+            <li>First plan: adapt a large existing vision-language model (Qwen2.5-VL) and add a training-free verification idea (SGV — checking a model's numeric claims against spectral measurements), delivered as a ten-module web app with an approval step after each module.</li>
+            <li>Read the two assigned survey papers (Weng et al. 2025 on vision-language models for remote sensing; Kim et al. 2025 on VQA) to understand the field.</li>
+            <li>Built module 1 (accounts, roles, audit trail — Argon2id hashing, single-use refresh tokens) and module 2 (image upload that checks the file really is what it claims, geo-metadata extraction, thumbnails). Four-layer architecture enforced by an automated test; about 103 tests; two review passes found and fixed 8 real issues.</li>
+          </ul>
+          <p class="result"><strong>Outcome:</strong> a real, tested backend — but no model of my own yet.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 02 · Early September</span>
+          <h3>The guide's review, and the pivot</h3>
+          <ul>
+            <li>Ashish's feedback: the <strong>model</strong> is the point — understand how a VQA model works inside, train one on real data using the institute's GPU. The web app is secondary but still expected, with a live demo.</li>
+            <li><strong>Decision:</strong> drop the big-model-plus-verification plan and rebuild around a small model that is trained here.</li>
+            <li>Chose <strong>LiT-4-RSVQA</strong> (Hackel et al. 2023): BERT-Tiny plus a small image transformer. Reasons: about 8 million parameters beat a 277-million-parameter model in the paper, fine-tuning a pretrained encoder beats training from scratch by about 13 points, and it fits a shared GPU slice.</li>
+            <li>Defined the project's own contribution: replace the paper's simple fusion with <strong>cross-attention</strong>, on identical data and settings, and measure whether it helps.</li>
+            <li>Ran a literature search (September 2026) to place the work against current systems (RS-MoE, Co-LLaVA, HSF-Net, and the larger RSVLM-QA benchmark).</li>
+          </ul>
+          <p class="result"><strong>Outcome:</strong> a new plan that matches what the guide asked for, with a real experiment at its centre.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 03 · Early September</span>
+          <h3>Data and model built — and verified without a GPU</h3>
+          <ul>
+            <li>Downloaded <strong>RSVQA-LR</strong>. Found a quirk in its files (every split file contains all questions, with a flag marking which belong to it) and verified the fix against the real data: exactly 57,223 train / 10,005 validation / 10,004 test = 77,232.</li>
+            <li>Built the pipeline: data loader; answer vocabulary from the 1,000 most common <em>training</em> answers only (no test leakage); BERT-Tiny (the official Google checkpoint — a community copy failed to load); XCiT-Nano (with DeiT-Tiny and MobileViT-S as alternatives); the elementwise fusion; the classifier.</li>
+            <li>Wrote training and evaluation scripts that run identically on CPU or GPU, and ran the whole pipeline end to end on the laptop CPU first, so scarce GPU time would not be spent finding basic bugs.</li>
+          </ul>
+          <p class="result"><strong>Outcome:</strong> 8,217,896 parameters, matching the paper's 8.1 million; a pipeline proven to run.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 04 · Early September</span>
+          <h3>Getting onto the institute's GPU cluster</h3>
+          <ul>
+            <li>Submitted the declaration form to the AI/ML centre's coordinator; received login details. Cluster jobs must go through the SLURM scheduler, one job per user.</li>
+            <li>Sorted out campus network registration so the cluster was reachable.</li>
+            <li>Wrote SLURM job scripts for a smoke test, training and evaluation, checked over before the first real session.</li>
+          </ul>
+        </li>
+
+        <li>
+          <span class="when">Step 05 · 8 September</span>
+          <h3>First real GPU session — four problems a laptop could not show</h3>
+          <ul>
+            <li><strong>Reserved GPU.</strong> Three of the four GPUs share one label; a plain "one GPU" request could land on the reserved one. <em>Fix:</em> request a named 1g.10gb slice of GPU 3.</li>
+            <li><strong>Driver mismatch.</strong> Default PyTorch was built for a newer CUDA than the driver (12.4), so training silently ran on the CPU. <em>Fix:</em> install the matching build.</li>
+            <li><strong>Slice addressing.</strong> The scheduler's slice identifier did not match what the GPU software needed, causing another silent CPU fallback. <em>Fix:</em> the job script looks up the correct identifier itself.</li>
+            <li><strong>Out of memory.</strong> The paper's batch of 512 does not fit a ~10 GB slice. <em>Fix:</em> batch 64.</li>
+          </ul>
+          <p class="result"><strong>Lesson:</strong> each was diagnosed from the cluster's own output. Two were silent — the job ran, just on the wrong device — so the logs had to be read, not just the exit status.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 06 · 8 September</span>
+          <h3>Baseline trained and tested</h3>
+          <ul>
+            <li>Ten epochs, about 73 minutes on one GPU slice. Scored once, on the held-out test split (9,838 questions).</li>
+          </ul>
+          <p class="result"><strong>Result:</strong> 72.74% overall, 75.16% average accuracy. By type: rural/urban 92.0%, presence 90.7%, comparison 90.4%, counting 27.5%. (The paper's 64.61% used a different, much larger dataset — not like-for-like.)</p>
+        </li>
+
+        <li>
+          <span class="when">Step 07 · Mid September</span>
+          <h3>Serving the model: the backend gets a brain (Module 3/4)</h3>
+          <ul>
+            <li>Added the question-answering service: ownership check, both models run, answers with confidence and runner-ups stored and audited. Model code shared with the training code instead of copied. Unit tests with hand-written fakes; 109 tests.</li>
+            <li>Found and fixed three packaging bugs by inspecting the built package, not assuming: a folder named <code>data</code> was silently dropped from the wheel (renamed <code>dataset</code>); the wheel was bundling the 150 MB dataset; the tokenizer loaded eagerly (test suite 154 s → 32 s).</li>
+            <li>The project report (Word) and the study material were kept in step throughout.</li>
+          </ul>
+        </li>
+
+        <li>
+          <span class="when">Step 08 · 17 September</span>
+          <h3>The cross-attention experiment fails</h3>
+          <ul>
+            <li>The first cross-attention run finished cleanly but scored only <strong>36.06%</strong> overall (27.07% average). Its validation accuracy sat on the same one or two values from the first epoch to the last.</li>
+          </ul>
+          <p class="result"><strong>Reading:</strong> a model giving nearly the same answer whatever it is asked. Not reported as a finding — investigated.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 09 · 21 September</span>
+          <h3>Bug found, proven, fixed — and an honest result</h3>
+          <ul>
+            <li><strong>Cause:</strong> the image and question had each been reduced to a single token before attention, so attention ran over one item; softmax over one item is always 1; the question never influenced the output.</li>
+            <li><strong>Proof:</strong> changing the question changed the module's output by exactly 0.0; changing the image changed it by 0.84.</li>
+            <li><strong>Fix:</strong> attend over sequences — every question word over all 197 image tokens. The fusion is now chosen inside the model (three scripts had each swapped it in by hand, which is how it went unnoticed). A regression test checks that both question and image change the output.</li>
+            <li>Also found that the backend imported a frozen <em>copy</em> of the model code, so the fix would never have reached the app; made the link live.</li>
+            <li>Retrained (about 91 minutes) and tested.</li>
+          </ul>
+          <p class="result"><strong>Result:</strong> 72.33% overall / 72.29% average — effectively tied with the baseline. Reported as "the richer fusion did not measurably help", with the caveat that each model was trained once.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 10 · 21 September</span>
+          <h3>The full web app: frontend, map, dashboard (Modules 5–7)</h3>
+          <ul>
+            <li>Next.js interface: sign-in, image library with drag-and-drop upload, a workspace showing both models' answers side by side with a low-confidence warning, question history.</li>
+            <li>Map view of georeferenced scenes; dashboard with measured accuracy and live usage (a new statistics endpoint in the backend, with tests).</li>
+            <li>Checked at desktop and phone widths; fixed a header that overflowed on mobile.</li>
+            <li>One-command demo launcher and a demo runbook. Testing the launcher from a cold start found a real bug (a database step that failed on the app's own database); fixed.</li>
+          </ul>
+          <p class="result"><strong>Outcome:</strong> a working live demo with both models loaded, about 0.4 s per question per model on a laptop CPU.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 11 · 21 September</span>
+          <h3>Testing the result honestly</h3>
+          <ul>
+            <li><strong>No-image baseline:</strong> a predictor that never sees the image (most common training answer for each exact question) scores <strong>70.42%</strong>. So the image adds only about two points overall — clearly on rural/urban (56% → 92% / 81%), slightly on presence and comparison, not at all on counting. Now a grey bar on the dashboard.</li>
+            <li><strong>Robustness study:</strong> dimming an image drops the baseline's rural/urban accuracy from 92% to 62%; halving its resolution drops it to 58%; and about 13% of answers flip under a mirror or rotation that cannot change the true answer.</li>
+            <li><strong>Custom image test:</strong> PNG/JPEG uploads work, but a 2× zoomed crop flipped an urban answer to rural at 95–99% confidence.</li>
+          </ul>
+          <p class="result"><strong>Conclusion:</strong> the model works on imagery like its training data and is brittle outside it. That is now a measured statement, and it set the next goal.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 12 · 21 September</span>
+          <h3>Backup and documentation</h3>
+          <ul>
+            <li>All code pushed to a private GitHub repository; the trained models, answer vocabulary and report attached to a release. Restore tested with a fresh clone and matching checksums.</li>
+            <li>Report updated with the real results, the failed first attempt, and the no-image finding; this presenter's guide written; demo runbook in the repo.</li>
+          </ul>
+        </li>
+
+        <li class="now">
+          <span class="when">Step 13 · 21 September onward · in progress</span>
+          <h3>Widening the model so it works beyond a few selected images</h3>
+          <ul>
+            <li><strong>Decision:</strong> a model useful beyond one dataset matters more than putting the demo online, so the deadline was extended by one to two weeks.</li>
+            <li><strong>Plan:</strong> retrain on RSVQA-LR <em>and</em> RSVQA-HR (15 cm aerial imagery, about a million questions; its second test set is an unseen city, Philadelphia), with augmentation that keeps the true answer correct. Optionally, a remote-sensing-pretrained image encoder (RemoteCLIP) afterwards. Pretrained starting points are used as in the paper — the training is still done here.</li>
+            <li><strong>Built so far:</strong> a resumable trainer that stops itself before the cluster's 4-hour limit and continues where it stopped (tested by interrupting and resuming); the augmentation, with a rule that directional questions are never mirrored (tested); a job script; a download job for the 14.4 GB dataset (running at about 1 MB/s). The original training script was left untouched so the baseline stays reproducible.</li>
+            <li>A bug caught in review before it cost a training run: data-loading workers were each replaying the same "random" augmentation sequence — fixed, with a test.</li>
+            <li><strong>Success is defined in advance:</strong> better accuracy on the unseen city, much smaller drops under the robustness changes, and no large loss on the original test set.</li>
+          </ul>
+          <p class="result"><strong>Status:</strong> results pending — target early October. It will still not answer free-text questions or handle sensors and regions that were not measured; those limits will be stated, not hidden.</p>
+        </li>
+      </ol>
+    </section>
+
     <section id="plan">
-      <span class="eyebrow">02 — Choose your length</span>
+      <span class="eyebrow">03 — Choose your length</span>
       <h2>Presenting it: three lengths, two audiences</h2>
       <div class="prose">
         <p class="lead">You may present to a crowd, to Ashish alone, or both. The content is the
@@ -476,7 +671,7 @@
             with: it answers about 73 out of 100 questions correctly on images it never saw, and
             it tells an urban scene from a rural one.</li>
           <li><strong>Ashish:</strong> lead with the experiment and the honest result. Expect "why"
-            at every step, and be ready to open the code (§13). He asked for understanding of the
+            at every step, and be ready to open the code (§14). He asked for understanding of the
             model's insides, so this is where the failed-attempt story and the no-image baseline
             count for the most.</li>
           <li><strong>Either way:</strong> say what the project is not — it can't write sentences,
@@ -489,7 +684,7 @@
           <li>The problem: satellite images, plain-English questions</li>
           <li>Why a small model (8 million parameters, not billions) — the LiT-4-RSVQA argument</li>
           <li>The data: RSVQA-LR, what a question and answer look like</li>
-          <li>The architecture: the pipeline diagram from §03</li>
+          <li>The architecture: the pipeline diagram from §04</li>
           <li>Baseline result: 72.7% overall, 75.2% average, per question type</li>
           <li>My experiment: cross-attention instead of the simple fusion</li>
           <li>The first attempt that failed (36%) and why — flat curve, softmax over one item</li>
@@ -502,7 +697,7 @@
     </section>
 
     <section id="how">
-      <span class="eyebrow">03 — Know this cold</span>
+      <span class="eyebrow">04 — Know this cold</span>
       <h2>How it works, end to end</h2>
       <div class="prose">
         <p class="lead">One picture and six plain steps. If you can draw this from memory and say
@@ -619,7 +814,7 @@
     </section>
 
     <section id="status">
-      <span class="eyebrow">04 — Be exact about progress</span>
+      <span class="eyebrow">05 — Be exact about progress</span>
       <h2>Where the project actually stands</h2>
       <div class="prose">
         <p class="lead">Both tracks are finished. The model is the main deliverable and
@@ -639,7 +834,8 @@
             <tr><td class="name">Dataset</td><td class="scope">RSVQA-LR: 772 images, 77,232 question-answer pairs; the split quirk in its files verified directly, not assumed</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (baseline), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Baseline training</td><td class="scope">Elementwise fusion, 10 epochs, about 73 minutes. 72.74% overall / 75.16% average accuracy on the held-out test split</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Cross-attention experiment</td><td class="scope">First attempt failed (design flaw, found and fixed — see §05). Corrected version: 72.33% overall / 72.29% average, about 90 minutes to train</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Cross-attention experiment</td><td class="scope">First attempt failed (design flaw, found and fixed — see §06). Corrected version: 72.33% overall / 72.29% average, about 90 minutes to train</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Widening the model (in progress)</td><td class="scope">Retrain on a second, aerial dataset (RSVQA-HR, with an unseen-city test set) plus augmentation, to fix the brittleness measured in the robustness study. Trainer built and tested; data downloading. Target: early October</td><td><span class="pill warn">In progress</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -668,7 +864,7 @@
       </div>
 
       <div class="prose">
-        <p>111 backend tests and 5 model tests pass, plus an architecture test that fails
+        <p>111 backend tests and 12 model tests pass, plus an architecture test that fails
           the build if the layering rule is ever violated. There's a one-command demo
           launcher and a written runbook with a walkthrough script and the test images
           that work best.</p>
@@ -676,7 +872,7 @@
     </section>
 
     <section id="results">
-      <span class="eyebrow">05 — The numbers, and how to read them</span>
+      <span class="eyebrow">06 — The numbers, and how to read them</span>
       <h2>The results</h2>
       <div class="prose">
         <p class="lead">Measured on RSVQA-LR's official held-out test split — 9,838
@@ -755,7 +951,7 @@
 
 
     <section id="demo">
-      <span class="eyebrow">06 — Do this on stage</span>
+      <span class="eyebrow">07 — Do this on stage</span>
       <h2>Live demo script</h2>
       <div class="prose">
         <p class="lead">Every question below was run through both models on this machine. The
@@ -841,7 +1037,7 @@
     </section>
 
     <section id="numbers">
-      <span class="eyebrow">07 — Memorise these</span>
+      <span class="eyebrow">08 — Memorise these</span>
       <h2>The numbers cheat-sheet</h2>
       <div class="prose"><p class="lead">Only facts measured or documented in this project. Read them aloud twice.</p></div>
       <div class="table-wrap">
@@ -877,7 +1073,7 @@
 
             <tr><th colspan="2">System</th></tr>
             <tr><td>Speed</td><td class="v">~0.4 s per question per model, laptop CPU</td></tr>
-            <tr><td>Tests</td><td class="v">111 backend + 5 model tests, all passing</td></tr>
+            <tr><td>Tests</td><td class="v">111 backend + 12 model tests, all passing</td></tr>
             <tr><td>Stack</td><td class="v">FastAPI · SQLAlchemy · SQLite (PostgreSQL-ready) · Next.js 16 · Tailwind · Leaflet</td></tr>
 
             <tr><th colspan="2">Timeline</th></tr>
@@ -892,7 +1088,7 @@
     </section>
 
     <section id="decisions">
-      <span class="eyebrow">08 — The "why," not just the "what"</span>
+      <span class="eyebrow">09 — The "why," not just the "what"</span>
       <h2>Why this plan, and why these specific choices</h2>
       <div class="prose">
         <p class="lead">A guide asking "why" is testing whether you understand the
@@ -920,7 +1116,7 @@
         <h3>Why RSVQA-LR, and not a bigger benchmark</h3>
         <p>Small enough to fully train and evaluate in the time and compute available, and
           it's the benchmark the paper itself reports on. Richer benchmarks now exist (see
-          §10); moving to one is honest future work, not something overlooked.</p>
+          §11); moving to one is honest future work, not something overlooked.</p>
 
         <h3>What the original contribution is</h3>
         <p>The paper's design is the baseline, reproduced. The experiment is swapping its
@@ -946,7 +1142,7 @@
     </section>
 
     <section id="vqa">
-      <span class="eyebrow">09 — For "do you actually understand VQA"</span>
+      <span class="eyebrow">10 — For "do you actually understand VQA"</span>
       <h2>The VQA background</h2>
       <div class="prose">
         <p class="lead">Visual Question Answering: a model is given an image and a
@@ -995,7 +1191,7 @@
     </section>
 
     <section id="literature">
-      <span class="eyebrow">10 — Name these with confidence</span>
+      <span class="eyebrow">11 — Name these with confidence</span>
       <h2>Papers and datasets worth knowing cold</h2>
       <div class="prose">
         <p class="lead">The core reading is the two surveys originally assigned —
@@ -1056,7 +1252,7 @@
 
 
     <section id="glossary">
-      <span class="eyebrow">11 — Say these in plain words</span>
+      <span class="eyebrow">12 — Say these in plain words</span>
       <h2>Glossary</h2>
       <div class="prose"><p class="lead">Each one is a definition you could say to a friend.</p></div>
       <dl class="terms">
@@ -1088,7 +1284,7 @@
     </section>
 
     <section id="questions">
-      <span class="eyebrow">12 — Rehearse these out loud once</span>
+      <span class="eyebrow">13 — Rehearse these out loud once</span>
       <h2>Questions to expect, and how to answer them</h2>
 
       <div class="qa">
@@ -1175,6 +1371,16 @@
           trained on one region and resolution (Sentinel-2 over the Netherlands), so it may not
           transfer elsewhere. Each model was trained once. And the test set, RSVQA-LR, is
           narrower than newer benchmarks like RSVLM-QA.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Walk me through what you did, from the start."</p>
+        <p class="a">Use §02: plan, review, pivot, build, cluster, baseline, serving, the failure, the
+          fix, the app, the honest tests, backup, and what's in progress. Thirty seconds is: "I
+          started with a big-model plan, my guide asked for a model I train myself, so I rebuilt it
+          around a small published design, trained a baseline on the cluster, tested my own
+          cross-attention idea — which failed at first because of a bug I traced and fixed — built a
+          working demo, then measured where it breaks and started widening it."</p>
       </div>
 
       <div class="qa">
@@ -1282,7 +1488,7 @@
 
 
     <section id="ownership">
-      <span class="eyebrow">13 — The part that decides how it goes</span>
+      <span class="eyebrow">14 — The part that decides how it goes</span>
       <h2>What you must be able to do without help</h2>
       <div class="prose">
         <p class="lead">A guide grades understanding. A polished result you can't explain scores
@@ -1300,13 +1506,13 @@
 
         <h3>Eight things to rehearse out loud</h3>
         <ol class="plain">
-          <li>Draw the pipeline from memory (§03) and say what each box outputs.</li>
+          <li>Draw the pipeline from memory (§04) and say what each box outputs.</li>
           <li>Explain both fusions in two sentences each.</li>
           <li>Tell the 36% story in 60 seconds, including the exact cause: attention over one item, softmax gives it weight 1, so the question never affects the output.</li>
           <li>Read a training curve: flat validation accuracy from epoch 0 means it isn't learning from the question; falling training loss with flat validation accuracy means it has plateaued or is starting to memorise.</li>
           <li>Explain overall vs. average accuracy, and why 11 rural/urban questions moved the average by about 3 points.</li>
           <li>Explain the no-image baseline and what it means for the results.</li>
-          <li>Run the demo from a cold start, and recover from the three failures in §06.</li>
+          <li>Run the demo from a cold start, and recover from the three failures in §07.</li>
           <li>Open the key files below and say what each does.</li>
         </ol>
 
@@ -1336,14 +1542,14 @@
         <h3>A study order</h3>
         <p>For how each component works from first principles, read the
           <a href="https://claude.ai/code/artifact/5bfca91a-3a98-41ba-87b5-e79441ab1a65">VQA Model Internals</a>
-          study notes. Then: one session on §03 and §11 until you can draw and explain the
-          pipeline; one on §05, §07 and the failed-attempt story; one on rehearsing §06 twice and
-          answering §12 out loud. About three focused sessions.</p>
+          study notes. Then: one session on §04 and §12 until you can draw and explain the
+          pipeline; one on §06, §08 and the failed-attempt story; one on rehearsing §07 twice and
+          answering §13 out loud. About three focused sessions.</p>
       </div>
     </section>
 
     <section id="unknown">
-      <span class="eyebrow">14 — The most important paragraph on this page</span>
+      <span class="eyebrow">15 — The most important paragraph on this page</span>
       <h2>If you're asked something you genuinely don't know</h2>
       <div class="prose">
         <p>Say so, specifically. "I haven't tested that — I'd need to run it on the held-out
@@ -1359,7 +1565,7 @@
 </div>
 
 <footer>
-  Living reference, not a final script. Updated 2026-09-21 as the full presenter's guide, with the trained results
+  Living reference, not a final script. Updated 2026-09-21 (with the step-by-step journey) as the full presenter's guide, with the trained results
   (baseline 72.74% / 75.16%, cross-attention 72.33% / 72.29% on the RSVQA-LR test split),
   the account of the failed first cross-attention run, and the completed web app. The
   literature section is grounded in a read of both originally-assigned surveys — Weng,
