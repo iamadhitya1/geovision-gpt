@@ -57,9 +57,13 @@ fi
 COUNT=$(find . -type f \( -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.jpg' -o -iname '*.jpeg' \) | wc -l)
 echo "--- image files found: $COUNT (expected 10659)"
 echo "--- layout:"
-ls | head -20
-find . -maxdepth 3 -type d | head -10
-find . -type f \( -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.jpg' -o -iname '*.jpeg' \) | head -3
+# `|| true` on each: under set -o pipefail, `find | head -N` can kill `find` with SIGPIPE once
+# `head` has its N lines and closes the pipe early, and pipefail then aborts the whole script via
+# set -e — confirmed the cause of job 4336 dying silently right here (sacct showed exit 13:0,
+# i.e. SIGPIPE) with the download and extraction already fully complete.
+ls | head -20 || true
+find . -maxdepth 3 -type d | head -10 || true
+find . -type f \( -iname '*.png' -o -iname '*.tif' -o -iname '*.tiff' -o -iname '*.jpg' -o -iname '*.jpeg' \) | head -3 || true
 
 if [ "$COUNT" -ge 10000 ] && [ -f Images.tar ]; then
   echo "--- image count OK, deleting Images.tar to save shared space"
