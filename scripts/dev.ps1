@@ -63,8 +63,8 @@ switch ($Task) {
         # frontend (no first-visit compile pauses, unlike `npm run dev`), and the browser.
         $Frontend = Join-Path $PSScriptRoot '..\frontend' | Resolve-Path
         $Checkpoints = Join-Path $Backend 'checkpoints'
-        if (-not (Test-Path (Join-Path $Checkpoints 'answer_vocab.json'))) {
-            Write-Warning "No answer_vocab.json in $Checkpoints - questions will fail until the trained checkpoints are copied there (see ml/README.md)."
+        if (-not (Test-Path (Join-Path $Checkpoints 'answer_vocab_generalist.json'))) {
+            Write-Warning "No answer_vocab_generalist.json in $Checkpoints - questions will fail until the trained checkpoints are copied there. Run: gh release download v1.0-trained-models --dir backend/checkpoints --pattern '*.pt' --pattern '*.json' (see README.md)."
         }
         # No `alembic upgrade` here on purpose: the default SQLite profile creates any missing
         # tables itself at startup, and alembic refuses a database it didn't create ("table

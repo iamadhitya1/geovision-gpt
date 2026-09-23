@@ -31,6 +31,42 @@ pivot; whether/how it returns as a layer on top of the trained classifier is sti
 See [`docs/02-research-contribution.md`](docs/02-research-contribution.md) for that
 original framing.
 
+## Run it on a new device
+
+Everything needed to go from a fresh clone to the running app, in order. Windows PowerShell
+shown; see [`frontend/README.md`](frontend/README.md) for the frontend piece on other
+platforms — the rest is the same everywhere `uv` and `gh` run.
+
+```powershell
+git clone https://github.com/iamadhitya1/geovision-gpt.git
+cd geovision-gpt
+```
+
+```powershell
+cd backend; uv venv --python 3.11; uv pip install -e ".[dev]"; cd ..
+```
+
+```powershell
+cd frontend; npm install; cd ..
+```
+
+```powershell
+gh release download v1.0-trained-models --dir backend\checkpoints --pattern "*.pt" --pattern "*.json"
+```
+
+```powershell
+.\scripts\dev.ps1 demo
+```
+
+The last command opens the app at <http://localhost:3000> after about 40 seconds. Requires:
+Python 3.11 with [uv](https://docs.astral.sh/uv/) installed, Node.js 20+, and the
+[GitHub CLI](https://cli.github.com/) (`gh`) signed in with access to this private repo.
+No GPU is needed to run the app — only for retraining (see [`ml/README.md`](ml/README.md)).
+
+The first launch also needs internet briefly: the model downloads two small pretrained
+pieces (BERT-Tiny, XCiT-Nano) from Hugging Face before loading the trained weights on top,
+then caches them for next time.
+
 ## Status
 
 | Track | Scope | Status |
@@ -45,50 +81,43 @@ original framing.
 | Web app — Module 6 | Map view of georeferenced scenes | **Complete** |
 | Web app — Module 7 | Dashboard: model accuracy + live usage stats | **Complete** |
 
-Run it locally with `uvicorn app.main:app` in [`backend/`](backend) and `npm run dev` in
-[`frontend/`](frontend/README.md). Without trained checkpoints in `backend/checkpoints/` the
-app still starts and reports "no models loaded"; copy the `.pt` files and
-`answer_vocab.json` down from the HPC to enable questions.
+See "Run it on a new device" above to go from a fresh clone to the running app.
 
-## Getting the trained models (backup and restore)
+## Where the trained models actually live
 
-The trained checkpoints (about 68 MB) are deliberately **not** in git. They are attached to this
-repository's GitHub release `v1.0-trained-models`, together with the answer vocabulary and a copy of
-the project report. To restore them into a fresh clone:
-
-```bash
-gh release download v1.0-trained-models --dir backend/checkpoints \
-  --pattern "*.pt" --pattern "answer_vocab.json"
-```
-
-The original copies are also on the HPC cluster, in `~/geovision-gpt-ml/checkpoints/`. To retrain
-from scratch instead, see [`ml/README.md`](ml/README.md). The downloaded dataset (RSVQA-LR, about
-150 MB) is not stored here either; `ml/README.md` explains where to fetch it.
+Not in git — they're 33–37 MB each. Three copies exist, in order of how current they are:
+the HPC cluster (`~/geovision-gpt-ml/checkpoints/`, the source of truth while a model is
+still training), this repository's GitHub release `v1.0-trained-models` (what "Run it on a
+new device" above pulls from — kept in step with the cluster after each result lands), and
+whatever's currently in `backend/checkpoints/` on a given machine. To retrain from scratch,
+see [`ml/README.md`](ml/README.md); the downloaded datasets (RSVQA-LR and RSVQA-HR) aren't
+stored here either — that doc explains where to fetch them.
 
 Note: this repository is private. It names the institute in a few places (this README, the ml
 README, the report generator), so remove those first if you ever make it public.
 
-## Quick start (no Docker, no GPU required)
+## Backend only, no frontend (API via /docs)
+
+For working on the API alone:
 
 ```bash
 cd backend
 uv venv --python 3.11
 uv pip install -e ".[dev]"
-```
-
-Set a secret and run:
-
-```bash
 GVG_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(64))") uvicorn app.main:app --reload
 ```
 
 On Windows PowerShell:
 
 ```powershell
+cd backend
+uv venv --python 3.11
+uv pip install -e ".[dev]"
 $env:GVG_SECRET_KEY = "local-dev-secret-key-at-least-32-characters-long"; uvicorn app.main:app --reload
 ```
 
-Then open <http://localhost:8000/docs>.
+Then open <http://localhost:8000/docs>. Without trained checkpoints in `backend/checkpoints/`
+the app still starts and reports "no models loaded" for `/vqa/fusions`.
 
 On first start the bootstrap administrator is created from `GVG_FIRST_ADMIN_*`
 (default `admin@geovisiongpt.io` / `ChangeMe_Please_2026`). **Change it.** In production the
