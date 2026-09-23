@@ -93,14 +93,24 @@ class Settings(BaseSettings):
     first_admin_name: str = "Platform Administrator"
 
     # --- VQA model serving (Module 3) ----------------------------------------
-    # Paths to the trained checkpoints produced by ml/scripts/train.py on the institute
+    # Paths to the trained checkpoints produced by ml/scripts/train*.py on the institute
     # HPC (see ml/README.md) — copied down manually, not downloaded automatically, since
     # they only exist on the cluster until someone scp's them here. A missing file is
     # logged and that fusion variant is simply reported unavailable, not a startup error;
     # see TorchVqaModelRunner.
-    vqa_checkpoint_elementwise_path: str = "./checkpoints/xcit_nano_elementwise_epoch9.pt"
-    vqa_checkpoint_cross_attention_path: str = "./checkpoints/xcit_nano_cross_attention_epoch9.pt"
-    vqa_vocab_path: str = "./checkpoints/answer_vocab.json"
+    #
+    # These point at the "generalist" checkpoints (ml/scripts/train_generalist.py, tags
+    # gen_xcit / gen_xcit_xattn — trained on RSVQA-LR *and* RSVQA-HR with augmentation, see
+    # ml/README.md's robustness study) rather than the original xcit_nano_*_epoch9.pt pair.
+    # Deliberately NOT reusing the epoch9 filenames for these: ml/scripts/robustness_eval.py
+    # hardcodes those exact filenames to reproduce the already-published 09-21 robustness
+    # table for the *original* models — overwriting them would silently corrupt that
+    # historical record the next time that script is rerun.
+    vqa_checkpoint_elementwise_path: str = "./checkpoints/xcit_nano_elementwise_generalist.pt"
+    vqa_checkpoint_cross_attention_path: str = (
+        "./checkpoints/xcit_nano_cross_attention_generalist.pt"
+    )
+    vqa_vocab_path: str = "./checkpoints/answer_vocab_generalist.json"
     vqa_device: Literal["auto", "cpu", "cuda"] = "auto"
     vqa_top_k_alternatives: int = Field(default=3, ge=1, le=20)
 

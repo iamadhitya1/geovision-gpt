@@ -121,7 +121,7 @@ split, and every demo image comes from it.
 
 | Symptom | Fix |
 |---|---|
-| Pill says "no models loaded" | The checkpoints/vocab are missing from `backend/checkpoints/`. Copy `xcit_nano_elementwise_epoch9.pt`, `xcit_nano_cross_attention_epoch9.pt`, and `answer_vocab.json` there and restart. |
+| Pill says "no models loaded" | The checkpoints/vocab are missing from `backend/checkpoints/`. Copy `xcit_nano_elementwise_generalist.pt`, `xcit_nano_cross_attention_generalist.pt`, and `answer_vocab_generalist.json` there and restart. |
 | Pill says "1 of 2" | One checkpoint is missing. The demo still works with one; say "the second model isn't loaded on this machine". |
 | Blank page / can't sign in | Backend window closed. Re-run `.\scripts\dev.ps1 demo`. |
 | Map is grey | No internet for tiles. Skip the map. |
