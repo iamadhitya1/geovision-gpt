@@ -20,6 +20,8 @@ every piece works. This README is the practical runbook.
 | Baseline (elementwise fusion) trained + evaluated on HPC | **Done** — see result below |
 | Cross-attention fusion, first attempt | **Failed by design flaw** — see "First cross-attention attempt" below |
 | Cross-attention fusion, corrected version (the actual experiment) | **Done** — see "Cross-attention result" below |
+| Widening the model: RSVQA-LR + RSVQA-HR, augmentation (elementwise) | **Done** — generalises to an unseen city, fixes the robustness weakness — see below |
+| Widening the model: cross-attention variant | **In progress** — see below |
 
 ### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
 
@@ -125,6 +127,80 @@ answer** — a model that understood the scene would flip none. Mirroring and ro
 rural/urban, so the weakness is appearance and scale, not geometry. This is what
 `dataset/augment.py` (brightness/contrast/saturation, resolution loss, and mirror/rotate for
 non-directional questions) and the second, aerial-scale dataset (RSVQA-HR) are meant to fix.
+
+## Widening the model — training beyond a single dataset
+
+Both models above are trained on a single dataset (RSVQA-LR: one country, one sensor, one
+10m resolution) and the robustness study above shows exactly what that costs: dimming an
+image alone dropped rural/urban accuracy from 92% to 62%. Starting 2026-09-21, the model was
+retrained on RSVQA-LR *and* RSVQA-HR (Lobry et al., same paper family — 15cm aerial imagery,
+~1.07M questions, CC-BY-4.0, [Zenodo record 6344367](https://zenodo.org/records/6344367)),
+with label-preserving augmentation (`dataset/augment.py`), to test whether a small model can
+generalise beyond the one benchmark it happened to be trained on.
+
+New code, `train.py`/`evaluate.py` untouched so the original baseline stays exactly
+reproducible: `dataset/rsvqa_hr_dataset.py` (RSVQA-HR loader — same active-flag file quirk as
+RSVQA-LR, but only 4 question types, no `rural_urban`, and `area` answers are excluded as
+near-unique strings like `"521m2"` that a fixed vocabulary can't represent),
+`scripts/train_generalist.py` (resumable — stops itself before the cluster's 4-hour limit and
+picks up from the same step; verified by deliberately interrupting and resuming a run),
+`scripts/evaluate_generalist.py` and `scripts/robustness_eval_generalist.py`.
+
+### Elementwise generalist result (2026-09-22/23, `TAG=gen_xcit`, job 4341 trained / jobs 4349, 4364 evaluated)
+
+10 epochs' worth of RSVQA-LR mixed with 60,000 RSVQA-HR questions per epoch (8 epochs total,
+best-by-validation checkpoint was epoch 5), batch 64, bf16 mixed precision — completed in one
+~95-minute job, no resume needed. Evaluated on three held-out test sets:
+
+| | RSVQA-LR test | RSVQA-HR test (same cities as training) | RSVQA-HR Philadelphia (**unseen city**) |
+|---|---|---|---|
+| Overall | 72.02% | 81.87% | 77.21% |
+| Average | 73.65% | 81.36% | 76.54% |
+| Presence | 89.0% | 90.2% | 84.6% |
+| Comparison | 89.8% | 87.7% | 84.7% |
+| Counting | 27.9% | 66.2% | 60.3% |
+| Rural/urban | 88.0% | — (RSVQA-HR has no rural/urban questions) | — |
+
+**Reading it honestly.** Against the original single-dataset baseline (72.74% / 75.16%), the
+generalist model costs almost nothing on RSVQA-LR (−0.7 / −1.5 points) — training on a second,
+very different dataset did not come at the expense of the first. Moving from RSVQA-HR's own
+test cities to Philadelphia, a city the model never saw in any form during training, costs
+about 5 points (82%→77% overall) — a real but modest generalisation gap, not a collapse to
+guessing. That is the actual evidence for "this model generalises beyond a handful of selected
+images": a genuinely unseen city, on a dataset built independently of RSVQA-LR, still gets
+answered correctly more than three-quarters of the time.
+
+**One number not to over-read**: RSVQA-HR's 66% counting accuracy is *not* evidence that
+counting was fixed — RSVQA-LR's own counting accuracy is unchanged at 27.9%. RSVQA-HR's count
+answers are simply a different, easier distribution; counting remains the hard case for this
+size of model in general.
+
+### Did the augmentation fix the robustness problem? (`scripts/robustness_eval_generalist.py`, 2026-09-23)
+
+Same perturbations, same RSVQA-LR test images, so this compares directly against the original
+baseline's robustness table above.
+
+| Change | Original baseline (rural/urban) | Generalist model (rural/urban) |
+|---|---|---|
+| Original | 92.0% | 88.0% |
+| Darker (×0.6) | **62.0%** (−30 pts) | **88.0%** (±0) |
+| Half resolution | **58.0%** (−34 pts) | **85.0%** (−3 pts) |
+| Zoom 2× | 56.0% (−36 pts) | 81.0% (−7 pts) |
+| Mirrored / rotated 90° | 92% / 91% | 84% / 90% |
+
+On the other 1,000 questions, accuracy held steady or improved slightly under every
+perturbation, and — a cleaner signal than accuracy alone — the share of answers that stayed
+**exactly the same** as on the clean image rose from the 73–87% range to 90–98% across the
+board. **Yes, this is a real, measured fix**: the specific weakness the robustness study found
+(appearance and scale, not geometry) is what the second dataset and the augmentation directly
+target, and the model that used to lose a third of its accuracy from a dimmer image now barely
+notices.
+
+### Cross-attention generalist (in progress, `TAG=gen_xcit_xattn`)
+
+Same recipe, cross-attention fusion instead of elementwise, to keep the original
+baseline-vs-cross-attention comparison alive on the wider training setup. Submitted
+2026-09-23 (job 4365); results pending.
 
 ### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
 
