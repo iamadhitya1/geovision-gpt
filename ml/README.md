@@ -21,7 +21,7 @@ every piece works. This README is the practical runbook.
 | Cross-attention fusion, first attempt | **Failed by design flaw** — see "First cross-attention attempt" below |
 | Cross-attention fusion, corrected version (the actual experiment) | **Done** — see "Cross-attention result" below |
 | Widening the model: RSVQA-LR + RSVQA-HR, augmentation (elementwise) | **Done** — generalises to an unseen city, fixes the robustness weakness — see below |
-| Widening the model: cross-attention variant | **In progress** — see below |
+| Widening the model: cross-attention variant | **Done** — same generalisation and robustness gains as the elementwise version — see below |
 
 ### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
 
@@ -196,11 +196,55 @@ board. **Yes, this is a real, measured fix**: the specific weakness the robustne
 target, and the model that used to lose a third of its accuracy from a dimmer image now barely
 notices.
 
-### Cross-attention generalist (in progress, `TAG=gen_xcit_xattn`)
+### Cross-attention generalist result (2026-09-23/24, `TAG=gen_xcit_xattn`, job 4365 trained / jobs 4366, 4367 evaluated)
 
-Same recipe, cross-attention fusion instead of elementwise, to keep the original
-baseline-vs-cross-attention comparison alive on the wider training setup. Submitted
-2026-09-23 (job 4365); results pending.
+Same recipe as the elementwise generalist above, cross-attention fusion instead of
+elementwise, to keep the original baseline-vs-cross-attention comparison alive on the wider
+training setup — 8 epochs, best-by-validation checkpoint at epoch 5, one ~95-minute job, no
+resume needed. Evaluated on the same three held-out test sets:
+
+| | RSVQA-LR test | RSVQA-HR test (same cities as training) | RSVQA-HR Philadelphia (**unseen city**) |
+|---|---|---|---|
+| Overall | 71.96% | 80.42% | 74.42% |
+| Average | 73.91% | 79.87% | 73.83% |
+| Presence | 89.3% | 88.2% | 79.5% |
+| Comparison | 89.1% | 86.7% | 80.9% |
+| Counting | 28.3% | 64.8% | 61.1% |
+| Rural/urban | 89.0% | — | — |
+
+**Reading it honestly.** Against the original single-dataset cross-attention result
+(72.33% / 72.29%), the generalist version costs almost nothing on RSVQA-LR (−0.4 points
+overall, actually *up* 1.6 points on average) — same pattern as the elementwise generalist:
+training on a second dataset didn't cost the first. The unseen-city gap (Philadelphia vs.
+RSVQA-HR's own test cities) is about 6 points overall (80.4%→74.4%), essentially the same
+size as the elementwise generalist's ~5-point gap — so this isn't an elementwise-only effect,
+both fusion styles generalise to a city neither ever saw.
+
+**Robustness** (`scripts/robustness_eval_generalist.py`, 2026-09-24), same perturbations,
+same RSVQA-LR test images, compared against the *original* single-dataset cross-attention
+model's robustness table above:
+
+| Change | Original cross-attention (rural/urban) | Generalist cross-attention (rural/urban) |
+|---|---|---|
+| Original | 81.0% | 89.0% |
+| Darker (×0.6) | **66.0%** (−15 pts) | **86.0%** (−3 pts) |
+| Half resolution | 73.0% (−8 pts) | 81.0% (−8 pts) |
+| Zoom 2× | 58.0% | 70.0% |
+| Mirrored / rotated 90° | 79% / 84% | 88% / 92% |
+
+Same story as the elementwise fix: the darker-image drop shrinks from 15 points to 3, and
+clean-image accuracy itself is also higher (89% vs. 81%) simply from more training data. Half
+resolution still costs about the same *relative* amount, so that particular sensitivity isn't
+fully solved by this recipe — worth naming as an honest limit rather than claiming a full fix.
+The wider 1,000-question set shows the same pattern as the elementwise model: accuracy held
+steady across every perturbation (70.4%–72.4%), with 97–99% of answers staying exactly the
+same as on the clean image under brightness/resolution/geometry changes.
+
+**Which model does the app serve?** Both — the live demo shows the elementwise and
+cross-attention generalists side by side, same as the two original models did, so the
+project's core comparison (does richer fusion help?) stays intact on the wider training
+setup. Short answer on that comparison: still no measurable win for cross-attention, now
+confirmed on top of the generalization and robustness work too.
 
 ### First cross-attention attempt (2026-09-17, job 4324 trained / job 4330 evaluated) — a flawed design, not a result
 

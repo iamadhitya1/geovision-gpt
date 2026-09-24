@@ -2,9 +2,10 @@ import type { FusionType } from "./types";
 
 /**
  * Held-out test-set accuracy on RSVQA-LR (9,838 questions), from `ml/README.md`.
- * These are measured numbers, not placeholders: update `cross_attention` from the
- * evaluate_cross_attention job's output — it stays `null` (rendered as "pending") until
- * that run has actually produced a result.
+ * These are the "widened" (`gen_xcit` / `gen_xcit_xattn`) models the app actually serves —
+ * trained on RSVQA-LR + RSVQA-HR with augmentation, not the original single-dataset models.
+ * Measured on RSVQA-LR's test split so this stays comparable to the original numbers; the
+ * unseen-city (RSVQA-HR Philadelphia) and robustness results live only in `ml/README.md`.
  */
 export interface FusionResult {
   overall: number;
@@ -15,18 +16,17 @@ export interface FusionResult {
 export const TEST_SET_SIZE = 9838;
 
 export const RESULTS: Record<FusionType, FusionResult | null> = {
+  // TAG=gen_xcit, job 4341 (trained) / job 4349 (evaluated), 2026-09-22/23.
   elementwise: {
-    overall: 72.74,
-    average: 75.16,
-    byType: { rural_urban: 92.0, presence: 90.7, comp: 90.4, count: 27.5 },
+    overall: 72.02,
+    average: 73.65,
+    byType: { rural_urban: 88.0, presence: 89.0, comp: 89.8, count: 27.9 },
   },
-  // Job 4332 (trained) / 4333 (evaluated), 2026-09-21: the corrected token-sequence version.
-  // The first attempt (job 4324) scored 36.06% because the question never reached the
-  // classifier — a design bug documented in ml/README.md, deliberately not shown here.
+  // TAG=gen_xcit_xattn, job 4365 (trained) / job 4366 (evaluated), 2026-09-23/24.
   cross_attention: {
-    overall: 72.33,
-    average: 72.29,
-    byType: { rural_urban: 81.0, presence: 90.15, comp: 89.23, count: 28.77 },
+    overall: 71.96,
+    average: 73.91,
+    byType: { rural_urban: 89.0, presence: 89.3, comp: 89.1, count: 28.3 },
   },
 };
 

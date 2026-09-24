@@ -72,8 +72,10 @@ then caches them for next time.
 | Track | Scope | Status |
 |---|---|---|
 | **Model** | Dataset (RSVQA-LR), architecture, training/eval scripts | **Complete** |
-| **Model** | Baseline (elementwise fusion) trained + evaluated on HPC | **Complete** — 72.74% overall / 75.16% average accuracy on the held-out test split |
-| **Model** | Cross-attention fusion (the project's own experiment) | **Complete** — 72.33% overall / 72.29% average: effectively tied with the baseline; details and caveats in [`ml/README.md`](ml/README.md) |
+| **Model** | Widened training (RSVQA-LR + RSVQA-HR, augmentation), elementwise fusion — what the app serves | **Complete** — 72.0% overall on RSVQA-LR (no regression vs. the single-dataset baseline), 77.2% on an unseen city (Philadelphia), and the dimmed-image robustness weakness below is fixed (62%→88%). Details in [`ml/README.md`](ml/README.md) |
+| **Model** | Widened training, cross-attention fusion — what the app serves | **Complete** — 72.0% overall on RSVQA-LR, 74.4% on the unseen city; still effectively tied with the elementwise model, confirming richer fusion doesn't measurably help here either |
+| **Model** | Original single-dataset baseline (elementwise fusion) — superseded, kept for reference | 72.74% overall / 75.16% average on RSVQA-LR test; dimming an image dropped its rural/urban accuracy from 92%→62%, which is what motivated the widened training above |
+| **Model** | Original single-dataset cross-attention (the project's first experiment) — superseded, kept for reference | 72.33% overall / 72.29% average: effectively tied with the original baseline; details and caveats in [`ml/README.md`](ml/README.md) |
 | Web app — Module 1 | Authentication, RBAC, audit | **Complete** |
 | Web app — Module 2 | Satellite image management | **Complete** |
 | Web app — Module 3/4 | VQA inference service + model comparison API | **Complete** |

@@ -393,9 +393,9 @@
       script, the numbers, a glossary, and the questions to expect.
     </p>
     <div class="meta-row">
-      <span>STATUS: MODEL TRAINED &amp; TESTED · WEB APP COMPLETE · DEMO-READY · WIDENING THE MODEL (IN PROGRESS)</span>
+      <span>STATUS: MODEL TRAINED &amp; TESTED · WIDENED FOR GENERALISATION · WEB APP COMPLETE · DEMO-READY</span>
       <span>REPO: geovision-gpt</span>
-      <span>UPDATED 2026-09-21</span>
+      <span>UPDATED 2026-09-24</span>
     </div>
   </div>
 </header>
@@ -446,10 +446,14 @@
             one of a thousand answers. It's about 8 million parameters, not billions,
             because that's what actually fits on a shared GPU in a semester. I reproduced
             the paper's design and got 75.2% average accuracy on data the model never saw.
-            My own experiment was replacing the paper's simple fusion with cross-attention.
-            It tied the baseline — 72.3% against 72.7% overall — so the richer fusion
-            didn't measurably help. That's an honest result, and I can tell you about the
-            first attempt, which failed for an interesting reason. I also measured how much of the
+            My own experiment was replacing the paper's simple fusion with cross-attention —
+            it tied the baseline, so the richer fusion didn't measurably help. That's an
+            honest result, and I can tell you about the first attempt, which failed for an
+            interesting reason. I then measured a real weakness — the model was brittle
+            outside its one training dataset — and fixed it by retraining on a second,
+            independent dataset with augmentation: same accuracy on the original benchmark,
+            genuine generalisation to a city it never saw, and a robustness problem (a dimmer
+            image collapsing its accuracy) largely fixed. I also measured how much of the
             score is just guessing from the wording of the question: a model that never sees the
             image gets 70.4%, so the image adds about two points overall, and clearly more on
             urban-versus-rural."</p>
@@ -492,7 +496,8 @@
             <tr><td class="num">10</td><td class="num">21 Sep</td><td class="name">Frontend, map, dashboard (Modules 5–7)</td><td class="scope">Working live demo, tested at phone width</td></tr>
             <tr><td class="num">11</td><td class="num">21 Sep</td><td class="name">Honest evaluation: no-image floor, robustness</td><td class="scope">Image adds ~2 points; dimming breaks rural/urban</td></tr>
             <tr><td class="num">12</td><td class="num">21 Sep</td><td class="name">Backup and documentation</td><td class="scope">Private GitHub repo, restore-tested</td></tr>
-            <tr><td class="num">13</td><td class="num">21 Sep →</td><td class="name">Widening the model (in progress)</td><td class="scope">Second dataset + augmentation; target early Oct</td></tr>
+            <tr><td class="num">13</td><td class="num">22–23 Sep</td><td class="name">Widening the model: elementwise fusion</td><td class="scope">No regression on RSVQA-LR; generalises to an unseen city; robustness fixed (62%→88%)</td></tr>
+            <tr><td class="num">14</td><td class="num">23–24 Sep</td><td class="name">Widening the model: cross-attention fusion</td><td class="scope">Same generalisation and robustness gains confirmed; still tied with elementwise</td></tr>
           </tbody>
         </table>
       </div>
@@ -629,17 +634,26 @@
           </ul>
         </li>
 
-        <li class="now">
-          <span class="when">Step 13 · 21 September onward · in progress</span>
+        <li>
+          <span class="when">Step 13 · 22–23 September</span>
           <h3>Widening the model so it works beyond a few selected images</h3>
           <ul>
-            <li><strong>Decision:</strong> a model useful beyond one dataset matters more than putting the demo online, so the deadline was extended by one to two weeks.</li>
-            <li><strong>Plan:</strong> retrain on RSVQA-LR <em>and</em> RSVQA-HR (15 cm aerial imagery, about a million questions; its second test set is an unseen city, Philadelphia), with augmentation that keeps the true answer correct. Optionally, a remote-sensing-pretrained image encoder (RemoteCLIP) afterwards. Pretrained starting points are used as in the paper — the training is still done here.</li>
-            <li><strong>Built so far:</strong> a resumable trainer that stops itself before the cluster's 4-hour limit and continues where it stopped (tested by interrupting and resuming); the augmentation, with a rule that directional questions are never mirrored (tested); a job script; a download job for the 14.4 GB dataset (running at about 1 MB/s). The original training script was left untouched so the baseline stays reproducible.</li>
-            <li>A bug caught in review before it cost a training run: data-loading workers were each replaying the same "random" augmentation sequence — fixed, with a test.</li>
-            <li><strong>Success is defined in advance:</strong> better accuracy on the unseen city, much smaller drops under the robustness changes, and no large loss on the original test set.</li>
+            <li><strong>Decision:</strong> a model useful beyond one dataset matters more than putting the demo online, so the deadline was extended.</li>
+            <li><strong>Plan:</strong> retrain on RSVQA-LR <em>and</em> RSVQA-HR (15 cm aerial imagery, about a million questions; its second test set is an unseen city, Philadelphia), with augmentation that keeps the true answer correct.</li>
+            <li><strong>Built:</strong> a resumable trainer that stops itself before the cluster's 4-hour limit and continues where it stopped (tested by interrupting and resuming); augmentation, with a rule that directional questions are never mirrored (tested); a bug caught in review before it cost a training run — data-loading workers were each replaying the same "random" augmentation sequence, fixed with a test. The original training script was left untouched so the original baseline stays reproducible.</li>
+            <li><strong>Success was defined in advance:</strong> better accuracy on the unseen city, much smaller drops under the robustness changes, and no large loss on the original test set. All three held.</li>
           </ul>
-          <p class="result"><strong>Status:</strong> results pending — target early October. It will still not answer free-text questions or handle sensors and regions that were not measured; those limits will be stated, not hidden.</p>
+          <p class="result"><strong>Result:</strong> 72.02% overall on RSVQA-LR (essentially unchanged from the original 72.74%); 81.9% on RSVQA-HR's own test cities and 77.2%/76.5% on Philadelphia, a city never seen in any form during training — a real ~5-point generalisation gap, not a collapse. The robustness weakness measured in Step 11 is fixed: dimming an image now costs 0 points on rural/urban (was 30), and half-resolution costs 3 (was 34).</p>
+        </li>
+
+        <li>
+          <span class="when">Step 14 · 23–24 September</span>
+          <h3>Widening the cross-attention model too — keeping the original comparison alive</h3>
+          <ul>
+            <li><strong>Why:</strong> Step 09's baseline-vs-cross-attention comparison was the project's own experiment. Widening only the elementwise model would have quietly dropped that comparison — so the same recipe was retrained with cross-attention fusion instead.</li>
+            <li>Same setup: RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, one training job, evaluated on all three test sets, then robustness-checked with the same perturbations as Step 11.</li>
+          </ul>
+          <p class="result"><strong>Result:</strong> 71.96% / 73.91% on RSVQA-LR — still tied with elementwise (72.02% / 73.65%), confirming the richer fusion still doesn't measurably help after widening. The unseen-city gap is about 6 points (80.4%→74.4%), the same size as elementwise's — so both fusion styles generalise similarly. The robustness fix holds too: rural/urban's darker-image drop shrinks from 15 points (original cross-attention model) to 3. Both widened models now run side by side in the live app.</p>
         </li>
       </ol>
     </section>
@@ -668,8 +682,9 @@
         <ul class="plain">
           <li><strong>A crowd:</strong> lead with the demo and the picture. Say "a small AI model
             that reads the image and the question", not "XCiT-Nano". One number to leave them
-            with: it answers about 73 out of 100 questions correctly on images it never saw, and
-            it tells an urban scene from a rural one.</li>
+            with: it answers about 72 out of 100 questions correctly on images it never saw, it
+            tells an urban scene from a rural one, and it still gets most questions right about a
+            city it was never trained on.</li>
           <li><strong>Ashish:</strong> lead with the experiment and the honest result. Expect "why"
             at every step, and be ready to open the code (§14). He asked for understanding of the
             model's insides, so this is where the failed-attempt story and the no-image baseline
@@ -688,6 +703,9 @@
           <li>Baseline result: 72.7% overall, 75.2% average, per question type</li>
           <li>My experiment: cross-attention instead of the simple fusion</li>
           <li>The first attempt that failed (36%) and why — flat curve, softmax over one item</li>
+          <li>The robustness weakness: dimming an image alone dropped accuracy 92%→62%</li>
+          <li>Widening the model: a second dataset + augmentation fixes it, and generalises to
+            an unseen city — for both fusion styles</li>
           <li>Final results table with the no-image bar</li>
           <li>Live demo (or screenshots as a fallback)</li>
           <li>Limits and future work; then questions. Keep backup slides: the four cluster
@@ -782,17 +800,20 @@
             1,000 scores, one per possible answer. Softmax converts them to probabilities that add
             up to 100%. The app shows the top answer, its probability (the "confidence"), and the
             next-best answers.</li>
-          <li><strong>How it learned.</strong> It saw 57,223 training questions. For each, it
-            guessed; a "loss" measured how far the guess was from the right answer; an optimiser
-            (AdamW) nudged all ~8 million numbers a little (learning rate 5e-4). That happened 64
-            questions at a time, ten full passes ("epochs") over the data, about 73 minutes on one
-            GPU slice. Nothing was frozen: the pretrained image and text models were fine-tuned
-            too, which the paper found is worth about 13 points over starting from scratch.
-            After every epoch it was scored on a separate validation set to watch for
-            memorising.</li>
-          <li><strong>How it was tested.</strong> On 9,838 test questions that were never used to
-            train it or to make any decision. The final-epoch model was scored once — no picking
-            the best epoch on the test set.</li>
+          <li><strong>How it learned.</strong> The models the app actually serves saw RSVQA-LR's
+            57,223 training questions mixed with a random 60,000-question sample of a second,
+            much larger dataset (RSVQA-HR) each epoch. For each, it guessed; a "loss" measured how
+            far the guess was from the right answer; an optimiser (AdamW) nudged all ~8–9 million
+            numbers a little (learning rate 5e-4). That happened 64 questions at a time, 8 full
+            passes ("epochs") over the mixed data, about 95 minutes on one GPU slice. Nothing was
+            frozen: the pretrained image and text models were fine-tuned too, which the paper
+            found is worth about 13 points over starting from scratch. After every epoch it was
+            scored on a separate validation set to watch for memorising and pick the best epoch.</li>
+          <li><strong>How it was tested.</strong> On three held-out test sets it never trained on:
+            RSVQA-LR's own 9,838 questions (for direct comparison with the original single-dataset
+            models), RSVQA-HR's own test cities, and RSVQA-HR's Philadelphia split — a city that
+            appears nowhere in training, the real test of generalising beyond a handful of
+            selected images.</li>
         </ol>
 
         <h3>How the web app fits around it</h3>
@@ -831,11 +852,10 @@
             <tr><th>Stage</th><th>Detail</th><th>Status</th></tr>
           </thead>
           <tbody>
-            <tr><td class="name">Dataset</td><td class="scope">RSVQA-LR: 772 images, 77,232 question-answer pairs; the split quirk in its files verified directly, not assumed</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (baseline), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Baseline training</td><td class="scope">Elementwise fusion, 10 epochs, about 73 minutes. 72.74% overall / 75.16% average accuracy on the held-out test split</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Cross-attention experiment</td><td class="scope">First attempt failed (design flaw, found and fixed — see §06). Corrected version: 72.33% overall / 72.29% average, about 90 minutes to train</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Widening the model (in progress)</td><td class="scope">Retrain on a second, aerial dataset (RSVQA-HR, with an unseen-city test set) plus augmentation, to fix the brittleness measured in the robustness study. Trainer built and tested; data downloading. Target: early October</td><td><span class="pill warn">In progress</span></td></tr>
+            <tr><td class="name">Dataset</td><td class="scope">RSVQA-LR: 772 images, 77,232 question-answer pairs; the split quirk in its files verified directly, not assumed. Widened with RSVQA-HR: ~1.07M questions, 15cm aerial imagery, an unseen-city test set</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (elementwise), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Original single-dataset training (superseded, kept for reference)</td><td class="scope">10 epochs, about 73–91 minutes each. Elementwise 72.74% / 75.16%, cross-attention 72.33% / 72.29% on RSVQA-LR's test split — see §06 for the robustness weakness this exposed</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Widened training — what the app serves</td><td class="scope">Both fusions retrained on RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, about 95 minutes each. No regression on RSVQA-LR, generalises to an unseen city, and the robustness weakness is fixed — full numbers in §06</td><td><span class="pill live">Done</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -875,50 +895,91 @@
       <span class="eyebrow">06 — The numbers, and how to read them</span>
       <h2>The results</h2>
       <div class="prose">
-        <p class="lead">Measured on RSVQA-LR's official held-out test split — 9,838
-          questions the models never saw during training. Each model was trained once.</p>
+        <p class="lead">These are the widened models — trained on RSVQA-LR and RSVQA-HR
+          together — measured on RSVQA-LR's official held-out test split (9,838 questions the
+          models never saw during training) so they stay directly comparable to the original
+          single-dataset numbers below. Each model was trained once.</p>
       </div>
 
       <div class="table-wrap">
         <table class="compare">
           <thead>
-            <tr><th>Test accuracy</th><th class="num">Baseline (elementwise)</th><th class="num">Cross-attention</th><th class="num">No image (guess)</th><th class="num">Test questions</th></tr>
+            <tr><th>Test accuracy (RSVQA-LR)</th><th class="num">Elementwise</th><th class="num">Cross-attention</th><th class="num">No image (guess)</th><th class="num">Test questions</th></tr>
           </thead>
           <tbody>
-            <tr><td>Overall</td><td class="num win">72.74%</td><td class="num">72.33%</td><td class="num">70.42%</td><td class="num">9,838</td></tr>
-            <tr><td>Average (paper's metric)</td><td class="num win">75.16%</td><td class="num">72.29%</td><td class="num">64.84%</td><td class="num">—</td></tr>
-            <tr><td>Rural / urban</td><td class="num win">92.0%</td><td class="num">81.0%</td><td class="num">56.0%</td><td class="num">100</td></tr>
-            <tr><td>Presence</td><td class="num win">90.7%</td><td class="num">90.2%</td><td class="num">88.3%</td><td class="num">2,955</td></tr>
-            <tr><td>Comparison</td><td class="num win">90.4%</td><td class="num">89.2%</td><td class="num">87.1%</td><td class="num">4,002</td></tr>
-            <tr><td>Counting</td><td class="num">27.5%</td><td class="num win">28.8%</td><td class="num">28.0%</td><td class="num">2,781</td></tr>
+            <tr><td>Overall</td><td class="num win">72.02%</td><td class="num">71.96%</td><td class="num">70.42%</td><td class="num">9,838</td></tr>
+            <tr><td>Average (paper's metric)</td><td class="num">73.65%</td><td class="num win">73.91%</td><td class="num">64.84%</td><td class="num">—</td></tr>
+            <tr><td>Rural / urban</td><td class="num">88.0%</td><td class="num win">89.0%</td><td class="num">56.0%</td><td class="num">100</td></tr>
+            <tr><td>Presence</td><td class="num win">89.0%</td><td class="num">89.3%</td><td class="num">88.3%</td><td class="num">2,955</td></tr>
+            <tr><td>Comparison</td><td class="num win">89.8%</td><td class="num">89.1%</td><td class="num">87.1%</td><td class="num">4,002</td></tr>
+            <tr><td>Counting</td><td class="num">27.9%</td><td class="num win">28.3%</td><td class="num">28.0%</td><td class="num">2,781</td></tr>
           </tbody>
         </table>
       </div>
 
       <div class="prose">
         <h3>How to read it honestly</h3>
-        <p><strong>The two are effectively tied.</strong> Overall they differ by 0.4 points,
-          about 40 questions out of 9,838. The bigger gap in <em>average</em> accuracy
-          (3 points) comes almost entirely from rural/urban: it has only 100 test
-          questions, but the average weights it as a quarter of the score, so the baseline
-          getting 11 more of them right moves the average by nearly 3 points. On the three
-          large categories the models are within about 1.3 points either way, with
-          cross-attention slightly ahead on counting.</p>
-        <p><strong>What you can and can't claim.</strong> You can say cross-attention did not
-          measurably improve on the baseline in this setup, at about 13% more parameters.
-          You can't say the baseline is better — the difference is inside what one training
-          run can't distinguish. Counting is weak for both (about 28%), consistent with it
-          being the hardest question type for small VQA models generally.</p>
-        <p><strong>Against the paper.</strong> The paper reports 64.61%; your baseline is
-          higher, but it trained on a much larger dataset (RSVQAxBEN, ~15M examples) and you
-          trained on RSVQA-LR directly, so it isn't like-for-like. Don't claim to have
-          beaten it.</p>
+        <p><strong>The two are still effectively tied</strong> — the same as before widening.
+          Overall they differ by 0.06 points, about 6 questions out of 9,838. On every
+          category the models are within about a point of each other. Widening the training
+          data didn't change which fusion wins; it changed how far both generalise (below).</p>
+        <p><strong>What you can and can't claim.</strong> You can say cross-attention still did
+          not measurably improve on elementwise fusion, at about 13% more parameters, and that
+          this held before <em>and</em> after widening the training data — a more robust
+          negative result than a single comparison would be. You can't say either fusion is
+          better. Counting is weak for both (about 28%), consistent with it being the hardest
+          question type for small VQA models generally.</p>
+        <p><strong>Against the paper.</strong> The paper reports 64.61%; these models are
+          higher, but it trained on a much larger dataset (RSVQAxBEN, ~15M examples) and these
+          train on RSVQA-LR directly, so it isn't like-for-like. Don't claim to have beaten it.</p>
+        <p><strong>Against the original, single-dataset models.</strong> Elementwise: 72.74% →
+          72.02% (−0.7 points). Cross-attention: 72.33% → 71.96% (−0.4 points). Training on a
+          second, very different dataset cost almost nothing on the first one — see below for
+          what it bought instead.</p>
+
+        <h3>Widening the model: generalisation and robustness (the newest result)</h3>
+        <p>The robustness study below (Step 11) found a real weakness: a model trained on one
+          dataset, one country, one sensor is brittle outside it — dimming an image alone
+          dropped rural/urban accuracy from 92% to 62%. Both models were retrained on RSVQA-LR
+          <em>and</em> RSVQA-HR (15cm aerial imagery, ~1.07M questions, an independent dataset
+          with its own unseen-city test split, Philadelphia) with label-preserving augmentation.</p>
+        <div class="table-wrap">
+          <table class="compare">
+            <thead><tr><th></th><th class="num">RSVQA-HR (same cities)</th><th class="num">RSVQA-HR Philadelphia (unseen city)</th></tr></thead>
+            <tbody>
+              <tr><td>Elementwise — overall / average</td><td class="num">81.9% / 81.4%</td><td class="num">77.2% / 76.5%</td></tr>
+              <tr><td>Cross-attention — overall / average</td><td class="num">80.4% / 79.9%</td><td class="num">74.4% / 73.8%</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Reading it honestly.</strong> A ~5–6 point gap between RSVQA-HR's own test
+          cities and Philadelphia — a city that appears nowhere in training, in any form — is a
+          real but modest generalisation cost, not a collapse to guessing. That is the actual
+          evidence for "generalises beyond a handful of selected images," and it holds for both
+          fusion styles, not just one.</p>
+        <p><strong>Did it fix the robustness problem?</strong> Yes, measurably, for both
+          models. Same perturbations, same RSVQA-LR test images, compared against each
+          model's own original single-dataset version:</p>
+        <div class="table-wrap">
+          <table class="compare">
+            <thead><tr><th>Change (rural/urban)</th><th class="num">Elementwise: original → widened</th><th class="num">Cross-attention: original → widened</th></tr></thead>
+            <tbody>
+              <tr><td>Clean image</td><td class="num">92% → 88%</td><td class="num">81% → 89%</td></tr>
+              <tr><td>Darker (×0.6)</td><td class="num win">62% → 88% (was −30 pts)</td><td class="num win">66% → 86% (was −15 pts)</td></tr>
+              <tr><td>Half resolution</td><td class="num win">58% → 85% (was −34 pts)</td><td class="num">73% → 81% (still −8 pts)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The darker-image drop, the clearest sign of the original brittleness, shrinks
+          dramatically for both fusions. Half-resolution improved for elementwise but not for
+          cross-attention — worth naming as an honest partial limit rather than claiming a
+          complete fix on every axis.</p>
 
         <h3>What the image actually adds — the number to know</h3>
         <p>A predictor that <strong>never looks at the image</strong> and answers each question with
           the most common training answer to that exact question scores <strong>70.42% overall</strong>
-          — because RSVQA-LR's questions are templated. So both models beat it by only about two
-          points. The image clearly matters for rural/urban (56% → 92% and 81%), adds a little on
+          — because RSVQA-LR's questions are templated. So both models beat it by only about 1.5–1.6
+          points overall. The image clearly matters for rural/urban (56% → 88% and 89%), adds a little on
           presence and comparison, and adds <strong>nothing on counting</strong>: both models are
           level with always saying "0". This is a known weakness of templated benchmarks, not of
           your implementation — but it is the honest floor to judge the models against, and an
@@ -974,8 +1035,9 @@
         <h3>The walkthrough (about 6 minutes)</h3>
         <ol class="plain">
           <li><strong>What it is (30 s).</strong> "Upload a satellite image, ask a question in plain
-            English, and two small models answer side by side — a published baseline and the
-            architecture I built to compare against it."</li>
+            English, and two small models answer side by side — one uses simple fusion, the other
+            cross-attention. Both are trained on two datasets together, not just one, so they
+            generalise beyond a single benchmark."</li>
           <li><strong>Upload (30 s).</strong> Drag in <code>243.tif</code>. Point at the metadata:
             size, resolution, coordinate system, location. "It reads the GeoTIFF's own geo
             information, so the image knows where on Earth it is."</li>
@@ -988,17 +1050,17 @@
             the time."</li>
           <li><strong>Map (45 s).</strong> The scene at its real location; toggle Dark / Satellite;
             click the footprint to jump back to the question workspace.</li>
-          <li><strong>Dashboard (1 min).</strong> The accuracy bars: teal baseline, amber
+          <li><strong>Dashboard (1 min).</strong> The accuracy bars: teal elementwise, amber
             cross-attention, grey no-image guess. "The two models tie. The grey bar is what you get
-            by not looking at the image at all — so the image adds about two points overall, and a
-            lot on urban-versus-rural."</li>
+            by not looking at the image at all — so the image adds about a point and a half
+            overall, and a lot on urban-versus-rural."</li>
         </ol>
       </div>
 
       <div class="table-wrap">
         <table class="compare">
-          <caption style="text-align:left;font-size:0.8rem;color:var(--ink-faint);margin-bottom:0.6rem">Verified with both models on this machine (baseline / cross-attention confidence).</caption>
-          <thead><tr><th>Image</th><th>Question</th><th>True answer</th><th>Both models say</th></tr></thead>
+          <caption style="text-align:left;font-size:0.8rem;color:var(--ink-faint);margin-bottom:0.6rem">Confidence percentages below were measured against the <em>original</em> single-dataset models. The app now serves the widened models (§02 Steps 13–14) — accuracy on these question types is similar or better (rural/urban is now 88–89% overall, up from 92%/81%), but the exact per-image confidence hasn't been re-measured. Run this exact walkthrough once before presenting and fill in real numbers — two minutes.</caption>
+          <thead><tr><th>Image</th><th>Question</th><th>True answer</th><th>Both models said (elementwise / cross-attention, original models)</th></tr></thead>
           <tbody>
             <tr><td>243.tif</td><td>Is it a rural or an urban area?</td><td>urban</td><td>urban (98% / 97%)</td></tr>
             <tr><td>246.tif</td><td>Is it a rural or an urban area?</td><td>rural</td><td>rural (100% / 100%)</td></tr>
@@ -1054,22 +1116,35 @@
             <tr><td>Image encoder</td><td class="v">XCiT-Nano, pretrained (ImageNet) · 197 × 128 output</td></tr>
             <tr><td>Text encoder</td><td class="v">BERT-Tiny (Google) · 2 layers, 128 wide, 2 heads</td></tr>
             <tr><td>Fusion / classifier</td><td class="v">512 wide · classifier 512 hidden, dropout 0.25, 1,000 outputs</td></tr>
-            <tr><td>Parameters</td><td class="v">8,217,896 baseline (paper: 8.1M) · 9,269,544 cross-attention</td></tr>
+            <tr><td>Parameters</td><td class="v">8,217,896 elementwise (paper: 8.1M) · 9,269,544 cross-attention</td></tr>
 
-            <tr><th colspan="2">Training</th></tr>
+            <tr><th colspan="2">Second dataset (RSVQA-HR, Lobry et al. — widening)</th></tr>
+            <tr><td>Images</td><td class="v">15cm aerial imagery, USGS — CC-BY-4.0, Zenodo record 6344367</td></tr>
+            <tr><td>Question–answer pairs</td><td class="v">~1.07M total; 60,000 sampled per epoch during training</td></tr>
+            <tr><td>Test sets</td><td class="v">own cities (189,617 Qs) · Philadelphia, unseen city (90,112 Qs)</td></tr>
+
+            <tr><th colspan="2">Training — original single-dataset models (superseded)</th></tr>
             <tr><td>Optimiser, rate</td><td class="v">AdamW, 5e-4 (the paper's value), same for both models</td></tr>
             <tr><td>Batch, epochs</td><td class="v">64 (paper: 512 — ran out of memory on the ~10 GB slice) · 10 epochs</td></tr>
             <tr><td>Hardware</td><td class="v">one 1g.10gb slice of an A100 (80 GB), SLURM</td></tr>
-            <tr><td>Time</td><td class="v">baseline ~73 min · cross-attention ~91 min</td></tr>
-            <tr><td>Validation accuracy</td><td class="v">baseline 72.0% after epoch 0, ~73–74% after — it plateaued early</td></tr>
+            <tr><td>Time</td><td class="v">elementwise ~73 min · cross-attention ~91 min</td></tr>
 
-            <tr><th colspan="2">Results — held-out test split</th></tr>
-            <tr><td>Baseline (elementwise)</td><td class="v">72.74% overall · 75.16% average</td></tr>
-            <tr><td>Cross-attention</td><td class="v">72.33% overall · 72.29% average</td></tr>
+            <tr><th colspan="2">Training — widened models (what the app serves)</th></tr>
+            <tr><td>Data mix</td><td class="v">all of RSVQA-LR + 60,000 RSVQA-HR questions per epoch, plus image augmentation</td></tr>
+            <tr><td>Batch, epochs</td><td class="v">64 · 8 epochs, bf16 mixed precision</td></tr>
+            <tr><td>Time</td><td class="v">elementwise ~95 min · cross-attention ~95 min, each one job, no resume needed</td></tr>
+
+            <tr><th colspan="2">Results — RSVQA-LR held-out test split (9,838 Qs)</th></tr>
+            <tr><td>Original elementwise / cross-attention (superseded)</td><td class="v">72.74% / 75.16% overall/avg · 72.33% / 72.29% overall/avg</td></tr>
+            <tr><td>Widened elementwise / cross-attention (live)</td><td class="v">72.02% / 73.65% overall/avg · 71.96% / 73.91% overall/avg</td></tr>
             <tr><td>No image at all</td><td class="v">70.42% overall · 64.84% average</td></tr>
-            <tr><td>By type: baseline / cross / no-image</td><td class="v">rural-urban 92.0 / 81.0 / 56.0 · presence 90.7 / 90.2 / 88.3 · comparison 90.4 / 89.2 / 87.1 · counting 27.5 / 28.8 / 28.0</td></tr>
-            <tr><td>The failed first attempt</td><td class="v">36.06% overall · 27.07% average</td></tr>
+            <tr><td>By type: widened elementwise / cross / no-image</td><td class="v">rural-urban 88.0 / 89.0 / 56.0 · presence 89.0 / 89.3 / 88.3 · comparison 89.8 / 89.1 / 87.1 · counting 27.9 / 28.3 / 28.0</td></tr>
+            <tr><td>The failed first cross-attention attempt</td><td class="v">36.06% overall · 27.07% average</td></tr>
             <tr><td>Paper (different dataset)</td><td class="v">64.61% average — not like-for-like</td></tr>
+
+            <tr><th colspan="2">Results — the widening's own numbers</th></tr>
+            <tr><td>Unseen city (Philadelphia): elementwise / cross-attention</td><td class="v">77.2% / 76.5% overall/avg · 74.4% / 73.8% overall/avg (own test cities: 81.9%/81.4% and 80.4%/79.9%)</td></tr>
+            <tr><td>Robustness fix, rural/urban, darker image</td><td class="v">elementwise 92%→62% (original) vs. 88%→88% (widened) · cross-attention 81%→66% (original) vs. 89%→86% (widened)</td></tr>
 
             <tr><th colspan="2">System</th></tr>
             <tr><td>Speed</td><td class="v">~0.4 s per question per model, laptop CPU</td></tr>
@@ -1079,9 +1154,10 @@
             <tr><th colspan="2">Timeline</th></tr>
             <tr><td>Late Aug 2026</td><td class="v">started, with the original large-model plan</td></tr>
             <tr><td>Early Sep</td><td class="v">guide's review → pivot to training a small model</td></tr>
-            <tr><td>8 Sep</td><td class="v">baseline trained and evaluated on the HPC</td></tr>
+            <tr><td>8 Sep</td><td class="v">original elementwise model trained and evaluated on the HPC</td></tr>
             <tr><td>17 Sep</td><td class="v">first cross-attention run: 36%</td></tr>
-            <tr><td>21 Sep</td><td class="v">bug found and fixed, retrained (72.3%); frontend, map, dashboard, report, demo</td></tr>
+            <tr><td>21 Sep</td><td class="v">bug found and fixed, retrained (72.3%); frontend, map, dashboard, report, demo; robustness study finds the brittleness</td></tr>
+            <tr><td>22–24 Sep</td><td class="v">widened both models on RSVQA-LR + RSVQA-HR; generalises to an unseen city; robustness fixed; app updated to serve them</td></tr>
           </tbody>
         </table>
       </div>
@@ -1129,6 +1205,17 @@
           forbidden from depending on outer ones, enforced by a test that fails the build.
           That's why the database can swap from SQLite to PostgreSQL, or the model runner
           can change, without touching business logic.</p>
+
+        <h3>Why widen the training to a second dataset</h3>
+        <p>The robustness study (§06, §02 Step 11) turned "it might be brittle" into a measured
+          fact: dimming an image alone dropped rural/urban accuracy from 92% to 62% — close to
+          the level of ignoring the image entirely. A model that only works on a small set of
+          selected images from one dataset isn't a strong result, whatever its accuracy number
+          says. Retraining on a second, independently-collected dataset (RSVQA-HR) with
+          augmentation directly targets that: it can't fix everything (half-resolution
+          robustness only improved for one of the two fusions), but it turned a real weakness
+          into a measured, mostly-fixed one, and it's the difference between "works on this
+          benchmark" and "works on satellite imagery like this benchmark's."</p>
 
         <h3>Why training ran on the institute HPC</h3>
         <p>No GPU on the laptop, and CPU training is impractical at this size. The cluster
@@ -1289,12 +1376,13 @@
 
       <div class="qa">
         <p class="q">"Did cross-attention beat the baseline?"</p>
-        <p class="a">No — it tied it. 72.3% against 72.7% overall on 9,838 held-out
-          questions. It was slightly better at counting and slightly worse at rural/urban,
-          but that category has only 100 test questions, so I don't read it as a real
-          difference. Each model was trained once, so the honest conclusion is that the
-          richer fusion didn't measurably help here, at about 13% more parameters. Repeating
-          runs with different seeds would be the next step.</p>
+        <p class="a">No — it tied it, both before and after I widened the training data. Most
+          recently: 71.96% against 72.02% overall on 9,838 held-out questions. Each model was
+          trained once, so the honest conclusion is that the richer fusion didn't measurably
+          help here, at about 13% more parameters — and that held up across two completely
+          different training setups, which makes it a more robust negative result than a
+          single comparison would be. Repeating runs with different seeds would be the next
+          step.</p>
       </div>
 
       <div class="qa">
@@ -1367,28 +1455,33 @@
       <div class="qa">
         <p class="q">"What are the limits?"</p>
         <p class="a">It answers from a fixed list of 1,000 answers, so it can't write free text
-          or answer questions outside that vocabulary. Counting is weak (about 28%). It's
-          trained on one region and resolution (Sentinel-2 over the Netherlands), so it may not
-          transfer elsewhere. Each model was trained once. And the test set, RSVQA-LR, is
-          narrower than newer benchmarks like RSVLM-QA.</p>
+          or answer questions outside that vocabulary. Counting is weak (about 28%). It now
+          generalises across two datasets and an unseen city, but that's still Sentinel-2 and
+          15cm aerial imagery specifically — an unfamiliar sensor or a resolution far outside
+          that range would likely need fine-tuning. Half-resolution robustness only improved for
+          one of the two fusions, and scale sensitivity (a heavily zoomed crop) isn't fully
+          solved. Each model was trained once. And the test sets are narrower than newer
+          benchmarks like RSVLM-QA.</p>
       </div>
 
       <div class="qa">
         <p class="q">"Walk me through what you did, from the start."</p>
         <p class="a">Use §02: plan, review, pivot, build, cluster, baseline, serving, the failure, the
-          fix, the app, the honest tests, backup, and what's in progress. Thirty seconds is: "I
+          fix, the app, the honest tests, backup, and widening. Thirty seconds is: "I
           started with a big-model plan, my guide asked for a model I train myself, so I rebuilt it
           around a small published design, trained a baseline on the cluster, tested my own
           cross-attention idea — which failed at first because of a bug I traced and fixed — built a
-          working demo, then measured where it breaks and started widening it."</p>
+          working demo, measured where it broke, then retrained both models on a second, independent
+          dataset with augmentation, which fixed the robustness weakness and proved they generalise
+          to a city neither ever saw."</p>
       </div>
 
       <div class="qa">
         <p class="q">"How much of that accuracy is just guessing from the question?"</p>
         <p class="a">A lot of it, and I measured it. A predictor that never sees the image and
           answers with the most common training answer to each exact question scores 70.4% overall on
-          the test set; my models score 72.7% and 72.3%. So the image adds about two points overall.
-          It clearly matters for rural/urban — 56% without the image, 92% and 81% with it — helps a
+          the test set; my models score 72.0% and 72.0%. So the image adds about a point and a half
+          overall. It clearly matters for rural/urban — 56% without the image, 88% and 89% with it — helps a
           little on presence and comparison, and doesn't help counting at all. That's a known
           weakness of templated benchmarks like RSVQA, and it's why I show the no-image bar next to
           the models on the dashboard.
@@ -1436,19 +1529,22 @@
       </div>
 
       <div class="qa">
-        <p class="q">"Why batch 64, learning rate 5e-4, ten epochs?"</p>
+        <p class="q">"Why batch 64, learning rate 5e-4, and why the epoch count changed from 10 to 8?"</p>
         <p class="a">The learning rate is the paper's. The paper used batch 512, which ran out of
-          memory on the roughly 10 GB GPU slice I had, so I used 64. I didn't tune anything, and
-          both models use identical settings, which keeps the comparison fair. The catch: batch size
-          differs from the paper, so my baseline isn't an exact replication.</p>
+          memory on the roughly 10 GB GPU slice I had, so I used 64 — for every model, original
+          and widened. Ten epochs was the original single-dataset setting; once RSVQA-HR was mixed
+          in, each epoch covers far more data (RSVQA-LR's full training set plus 60,000 sampled
+          RSVQA-HR questions), so 8 epochs was enough, chosen by watching validation accuracy plateau
+          the same way it did originally. I didn't otherwise tune anything, and both fusions always
+          use identical settings, which keeps the comparison fair.</p>
       </div>
 
       <div class="qa">
         <p class="q">"Which number should I quote — overall or average?"</p>
-        <p class="a">Overall means "how often is it right" — 72.7% for the baseline. Average is the
-          mean of the four question types, which is what the paper reports, so use it when comparing
-          to the paper. It's less stable here because rural/urban has only 100 questions but counts
-          as a quarter.</p>
+        <p class="a">Overall means "how often is it right" — 72.0% for the currently-deployed
+          elementwise model. Average is the mean of the four question types, which is what the paper
+          reports, so use it when comparing to the paper. It's less stable here because rural/urban
+          has only 100 questions but counts as a quarter.</p>
       </div>
 
       <div class="qa">
@@ -1461,9 +1557,28 @@
 
       <div class="qa">
         <p class="q">"Would it work on other cities or other satellites?"</p>
-        <p class="a">Untested. It was trained on Sentinel-2 imagery of the Netherlands with templated
-          questions, so I'd expect it to need fine-tuning for other sensors, resolutions or regions.
-          I'd say that plainly rather than guess.</p>
+        <p class="a">Partly tested now, and the answer is genuinely encouraging. I retrained on a
+          second, independent dataset (RSVQA-HR — 15cm aerial imagery, a different sensor and
+          scale from RSVQA-LR's 10m Sentinel-2) and evaluated on Philadelphia, a city that
+          appears nowhere in training in any form. It still answers about three-quarters of
+          questions correctly there — a real ~5-point gap from RSVQA-HR's own test cities, not a
+          collapse. That's the actual evidence for "generalises beyond a handful of selected
+          images." What's still untested: a sensor or region unlike either training dataset, or
+          resolutions far outside the ~10–15cm/pixel range these were trained on — I'd still
+          expect those to need fine-tuning, and I'd say so plainly.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why does dimming an image break the model, and did you actually fix it?"</p>
+        <p class="a">A model trained on one dataset learns shortcuts specific to that dataset's
+          exact appearance, not the underlying scene — so a change that doesn't touch the true
+          answer (brightness, resolution) can still flip the prediction. I measured it directly:
+          dimming an image alone dropped rural/urban accuracy from 92% to 62% on the original
+          model. After retraining on a second dataset with augmentation that includes brightness
+          and resolution changes, the same test now costs 0 points for elementwise fusion and 3
+          for cross-attention — essentially fixed for the exact weakness the study found. Half
+          the story is honest, though: a 2× zoom crop still hurts accuracy meaningfully, so scale
+          sensitivity isn't fully solved, and I say that rather than claim a complete fix.</p>
       </div>
 
       <div class="qa">
@@ -1481,7 +1596,8 @@
         <p class="a">Repeat each run with several random seeds to measure run-to-run noise; move to a
           larger benchmark such as RSVLM-QA; visualise which patches each word attends to, to see if
           cross-attention learns something sensible; try to fix counting, which is stuck at the
-          no-image level; and compare against a larger model to put a number on the small-model
+          no-image level; close the remaining scale/zoom sensitivity that the widened training didn't
+          fully fix; and compare against a larger model to put a number on the small-model
           trade-off.</p>
       </div>
     </section>
@@ -1512,6 +1628,9 @@
           <li>Read a training curve: flat validation accuracy from epoch 0 means it isn't learning from the question; falling training loss with flat validation accuracy means it has plateaued or is starting to memorise.</li>
           <li>Explain overall vs. average accuracy, and why 11 rural/urban questions moved the average by about 3 points.</li>
           <li>Explain the no-image baseline and what it means for the results.</li>
+          <li>Explain the robustness weakness in one sentence (dimming an image alone dropped
+            accuracy from 92% to 62%), what fixed it (a second dataset plus augmentation, not a
+            bigger model), and what it didn't fully fix (scale/zoom sensitivity).</li>
           <li>Run the demo from a cold start, and recover from the three failures in §07.</li>
           <li>Open the key files below and say what each does.</li>
         </ol>
@@ -1528,6 +1647,9 @@
             <tr><td class="name"><code>ml/dataset/rsvqa_lr_dataset.py</code></td><td class="scope">Data loading, the split quirk, the 1,000-answer vocabulary</td></tr>
             <tr><td class="name"><code>ml/scripts/question_only_baseline.py</code></td><td class="scope">The no-image floor, reproducible in one command</td></tr>
             <tr><td class="name"><code>ml/tests/test_fusion.py</code></td><td class="scope">Guards against the single-token bug: both question and image must change the output</td></tr>
+            <tr><td class="name"><code>ml/scripts/train_generalist.py</code></td><td class="scope">The widened trainer: resumable, mixes RSVQA-LR with a sample of RSVQA-HR each epoch, with augmentation</td></tr>
+            <tr><td class="name"><code>ml/scripts/robustness_eval_generalist.py</code></td><td class="scope">The perturbation study that proved the robustness fix</td></tr>
+            <tr><td class="name"><code>ml/dataset/augment.py</code></td><td class="scope">Label-preserving image augmentation — brightness, resolution, mirror/rotate</td></tr>
             <tr><td class="name"><code>ml/slurm/*.sbatch</code></td><td class="scope">The cluster job scripts</td></tr>
             <tr><td class="name"><code>backend/app/infrastructure/vqa/model_runner.py</code></td><td class="scope">Loads both checkpoints and runs predictions</td></tr>
             <tr><td class="name"><code>backend/app/application/vqa_service.py</code></td><td class="scope">The "ask a question" use case: ownership check, run models, save, audit</td></tr>
@@ -1565,13 +1687,18 @@
 </div>
 
 <footer>
-  Living reference, not a final script. Updated 2026-09-21 (with the step-by-step journey) as the full presenter's guide, with the trained results
-  (baseline 72.74% / 75.16%, cross-attention 72.33% / 72.29% on the RSVQA-LR test split),
-  the account of the failed first cross-attention run, and the completed web app. The
-  literature section is grounded in a read of both originally-assigned surveys — Weng,
-  Pang &amp; Xia (<em>IEEE GRSM</em>, Sept 2025) and Kim et al. (<em>ACM Computing
-  Surveys</em>, May 2025) — plus Hackel et al. (arXiv:2306.00758) and a literature search
-  run September 2026; page-level detail is worth re-checking before citing it aloud.
+  Living reference, not a final script. Updated 2026-09-24 with the widened models' real
+  results: both fusions retrained on RSVQA-LR + RSVQA-HR with augmentation (elementwise
+  72.02% / 73.65%, cross-attention 71.96% / 73.91% on the RSVQA-LR test split — the original
+  single-dataset numbers, 72.74% / 75.16% and 72.33% / 72.29%, are kept for reference), the
+  ~5–6 point unseen-city generalisation gap measured on RSVQA-HR's Philadelphia split, and
+  the robustness fix (dimmed-image rural/urban accuracy restored from 62%→88% and 66%→86%).
+  These are the models the live app now serves. The account of the failed first
+  cross-attention run and the completed web app are unchanged. The literature section is
+  grounded in a read of both originally-assigned surveys — Weng, Pang &amp; Xia (<em>IEEE
+  GRSM</em>, Sept 2025) and Kim et al. (<em>ACM Computing Surveys</em>, May 2025) — plus
+  Hackel et al. (arXiv:2306.00758) and a literature search run September 2026; page-level
+  detail is worth re-checking before citing it aloud.
 </footer>
 
 </body>
