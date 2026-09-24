@@ -1377,6 +1377,67 @@
       <span class="eyebrow">13 — Rehearse these out loud once</span>
       <h2>Questions to expect, and how to answer them</h2>
 
+      <div class="callout">
+        <p><strong>The four everyone asks.</strong> These are the questions a random visitor at
+          your stall is just as likely to ask as Ashish — say them in plain words first, and only
+          go technical (the jargon versions further down this section) if they specifically ask
+          for more depth.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why are there two models, not one?"</p>
+        <p class="a">Because comparing two ways of doing the same thing <em>is</em> the actual
+          experiment I ran — it's the one part of this project that's genuinely mine, not just
+          reproduced from a paper. Model A combines the picture and the question in a simple way.
+          Model B combines them in a fancier way, where the question can "look around" the whole
+          picture before deciding on an answer. Everything else about them is identical, so any
+          difference in how well they do is because of that one change — not because of anything
+          else. With only one model, I'd have nothing to compare and nothing to say "why" about.
+          The honest result: the fancier way didn't actually do any better here — which is itself
+          a real, useful finding, not a failure.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why can't I just type any question I want?"</p>
+        <p class="a">Because this isn't a chatbot that writes sentences — it's a model that picks
+          the best answer from a list of the 1,000 answers it learned during training, like a
+          multiple-choice test instead of an essay question. A model that could freely write any
+          sentence needs to be enormously bigger — billions of adjustable settings instead of
+          about 8 million — and would need far more computing power and training data than a
+          student project on a shared university GPU realistically has. Picking from a fixed list
+          is what lets a model this small actually work well, and it's the same approach the
+          published research this project follows uses. You can still type a question in your own
+          words — the model does its best to match it to what it learned — but it works best on
+          the plain, direct style of question it was actually trained on: "Is there a road?", "How
+          many buildings are there?", "Is this a rural or an urban area?"</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Why does it only work on certain images?"</p>
+        <p class="a">Because it only ever learned what roads, buildings, farmland and so on look
+          like from two specific kinds of pictures: satellite images of the Netherlands, and
+          aerial photos of a few American cities, both taken looking straight down from above. If
+          you show it something that looks very different from those — a close-up ground-level
+          photo, or a satellite image at a very different zoom level — it still gives an answer
+          (it always picks something), but that answer becomes unreliable, sometimes confidently
+          wrong. This is a completely normal limitation for this kind of model, not a bug, and I
+          measured it directly and fixed part of it by training on a second, very different
+          dataset — see the next answer.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"So what kind of images does it actually work well on?"</p>
+        <p class="a">Pictures taken looking straight down — like a satellite or drone photo, not
+          a street-level photo — showing a stretch of land a few kilometres across, at roughly the
+          same zoom level as Google Maps' satellite view or a bit sharper. It's been trained and
+          tested on real imagery like this from the Netherlands and several American cities,
+          including one city, Philadelphia, that it had never seen before, specifically to check
+          it wasn't just memorising one place. Ground-level photos, radar images, or pictures
+          zoomed in far closer or wider than that are outside what it was trained on, and I'd
+          expect it to need retraining to handle those properly — I'd say that plainly rather than
+          guess if asked.</p>
+      </div>
+
       <div class="qa">
         <p class="q">"Did cross-attention beat the baseline?"</p>
         <p class="a">No — it tied it, both before and after I widened the training data. Most
