@@ -1027,9 +1027,12 @@
             for the sign-in page, sign in, and check the top-right says
             <strong>"2 of 2 models online"</strong>.</li>
           <li>Have three files ready from <code>ml/dataset/rsvqa_lr/images/Images_LR/</code>:
-            <code>243.tif</code> (urban), <code>246.tif</code> (rural), <code>315.tif</code>
-            (farmland). All are from the held-out test set. Spares: <code>237.tif</code> (urban),
-            <code>235.tif</code> (rural).</li>
+            <code>237.tif</code> (urban), <code>246.tif</code> (rural), <code>315.tif</code>
+            (farmland). All are from the held-out test set. Spare: <code>235.tif</code> (rural).
+            <strong>Do not use <code>243.tif</code></strong> — re-verified 2026-09-24, the two
+            widened models now disagree on it (elementwise: urban 71%; cross-attention: rural
+            59%). Genuinely interesting if it comes up in conversation, but not what you want for
+            this opening beat.</li>
         </ol>
 
         <h3>The walkthrough (about 6 minutes)</h3>
@@ -1038,13 +1041,13 @@
             English, and two small models answer side by side — one uses simple fusion, the other
             cross-attention. Both are trained on two datasets together, not just one, so they
             generalise beyond a single benchmark."</li>
-          <li><strong>Upload (30 s).</strong> Drag in <code>243.tif</code>. Point at the metadata:
+          <li><strong>Upload (30 s).</strong> Drag in <code>237.tif</code>. Point at the metadata:
             size, resolution, coordinate system, location. "It reads the GeoTIFF's own geo
             information, so the image knows where on Earth it is."</li>
-          <li><strong>Urban vs. rural (2 min).</strong> Open 243, click the chip "Is it a rural or
-            an urban area?" → both say <em>urban</em>. Upload 246, same question → both say
-            <em>rural</em>. "Same question, two images, two answers — it's reading the picture,
-            not just the words."</li>
+          <li><strong>Urban vs. rural (2 min).</strong> Open 237, click the chip "Is it a rural or
+            an urban area?" → both say <em>urban</em> (99% / 79%). Upload 246, same question → both
+            say <em>rural</em> (100% / 99%). "Same question, two images, two answers — it's
+            reading the picture, not just the words."</li>
           <li><strong>A few more (1 min).</strong> On 315: presence and comparison questions. Say
             plainly: "these are easier — on this dataset the wording alone gets them right most of
             the time."</li>
@@ -1059,14 +1062,14 @@
 
       <div class="table-wrap">
         <table class="compare">
-          <caption style="text-align:left;font-size:0.8rem;color:var(--ink-faint);margin-bottom:0.6rem">Confidence percentages below were measured against the <em>original</em> single-dataset models. The app now serves the widened models (§02 Steps 13–14) — accuracy on these question types is similar or better (rural/urban is now 88–89% overall, up from 92%/81%), but the exact per-image confidence hasn't been re-measured. Run this exact walkthrough once before presenting and fill in real numbers — two minutes.</caption>
-          <thead><tr><th>Image</th><th>Question</th><th>True answer</th><th>Both models said (elementwise / cross-attention, original models)</th></tr></thead>
+          <caption style="text-align:left;font-size:0.8rem;color:var(--ink-faint);margin-bottom:0.6rem">Verified live 2026-09-24 against the widened models the app now actually serves.</caption>
+          <thead><tr><th>Image</th><th>Question</th><th>True answer</th><th>Elementwise</th><th>Cross-attention</th></tr></thead>
           <tbody>
-            <tr><td>243.tif</td><td>Is it a rural or an urban area?</td><td>urban</td><td>urban (98% / 97%)</td></tr>
-            <tr><td>246.tif</td><td>Is it a rural or an urban area?</td><td>rural</td><td>rural (100% / 100%)</td></tr>
-            <tr><td>315.tif</td><td>Is a cemetery present?</td><td>yes</td><td>yes (100% / 100%)</td></tr>
-            <tr><td>315.tif</td><td>Is there a rectangular road?</td><td>no</td><td>no (100% / 99%)</td></tr>
-            <tr><td>315.tif</td><td>Are there less roads than residential buildings in the image?</td><td>yes</td><td>yes (98% / 92%)</td></tr>
+            <tr><td>237.tif</td><td>Is it a rural or an urban area?</td><td>urban</td><td>urban, 99%</td><td>urban, 79%</td></tr>
+            <tr><td>246.tif</td><td>Is it a rural or an urban area?</td><td>rural</td><td>rural, 100%</td><td>rural, 99%</td></tr>
+            <tr><td>315.tif</td><td>Is a cemetery present?</td><td>yes</td><td>yes, 86%</td><td>yes, 97%</td></tr>
+            <tr><td>315.tif</td><td>Is there a rectangular road?</td><td>no</td><td>no, 90%</td><td>no, 100%</td></tr>
+            <tr><td>315.tif</td><td>Are there less roads than residential buildings in the image?</td><td>yes</td><td>yes, 84%</td><td>yes, 96%</td></tr>
           </tbody>
         </table>
       </div>
