@@ -53,22 +53,23 @@ export default function LoginPage() {
           </h1>
           <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
             Upload a scene, ask in plain English, and watch two lightweight models — one
-            published baseline, one new architecture — answer side by side.
+            simple fusion, one cross-attention — trained on two datasets and answer side by
+            side.
           </p>
         </div>
 
         <div className="flex gap-8 font-mono text-xs text-muted">
           <div>
-            <div className="text-2xl font-medium text-text tabular">8.2M</div>
-            parameters (baseline)
+            <div className="text-2xl font-medium text-text tabular">8.2M–9.3M</div>
+            parameters
           </div>
           <div>
             <div className="text-2xl font-medium text-text tabular">1,000</div>
             answer classes
           </div>
           <div>
-            <div className="text-2xl font-medium text-text tabular">57k</div>
-            training questions
+            <div className="text-2xl font-medium text-text tabular">117k</div>
+            training questions / epoch
           </div>
         </div>
 
