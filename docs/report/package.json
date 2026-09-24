@@ -1,6 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "docx": "^9.7.1"
+    "docx": "^9.7.1",
+    "image-size": "^2.0.4"
   }
 }

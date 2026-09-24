@@ -1,8 +1,11 @@
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   LevelFormat, convertInchesToTwip, PageBreak, Footer, PageNumber,
+  ImageRun, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign, ShadingType,
 } = require("docx");
 const fs = require("fs");
+const path = require("path");
+const sizeOf = require("image-size").default;
 
 const body = (text, opts = {}) => new Paragraph({
   children: [new TextRun({ text, ...opts })],
@@ -25,6 +28,95 @@ const numbered = (text) => new Paragraph({
 });
 
 const ref = (text) => new Paragraph({ text, spacing: { after: 120 }, style: "reference" });
+
+// ---- Figures ----
+const FIG_DIR = path.join(__dirname, "figures");
+let figureCount = 0;
+
+function figure(filename, displayWidth, captionText) {
+  figureCount += 1;
+  const filePath = path.join(FIG_DIR, filename);
+  const data = fs.readFileSync(filePath);
+  const dims = sizeOf(data);
+  const displayHeight = Math.round((displayWidth * dims.height) / dims.width);
+  const ext = path.extname(filename).slice(1);
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 160, after: 80 },
+      children: [
+        new ImageRun({
+          type: ext === "jpg" ? "jpeg" : "png",
+          data,
+          transformation: { width: displayWidth, height: displayHeight },
+        }),
+      ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 240 },
+      children: [
+        new TextRun({ text: `Figure ${figureCount}. ${captionText}`, italics: true, size: 19 }),
+      ],
+    }),
+  ];
+}
+
+// ---- Tables ----
+const CELL_BORDER = { style: BorderStyle.SINGLE, size: 2, color: "B0B0B0" };
+const CELL_BORDERS = { top: CELL_BORDER, bottom: CELL_BORDER, left: CELL_BORDER, right: CELL_BORDER };
+
+function cell(text, opts = {}) {
+  return new TableCell({
+    borders: CELL_BORDERS,
+    verticalAlign: VerticalAlign.CENTER,
+    width: opts.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
+    shading: opts.header
+      ? { type: ShadingType.CLEAR, fill: "1F2933" }
+      : opts.shade
+        ? { type: ShadingType.CLEAR, fill: "F2F4F5" }
+        : undefined,
+    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+    children: [
+      new Paragraph({
+        alignment: opts.center === false ? AlignmentType.LEFT : AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text,
+            bold: !!opts.header || !!opts.bold,
+            color: opts.header ? "FFFFFF" : undefined,
+            size: 20,
+          }),
+        ],
+      }),
+    ],
+  });
+}
+
+function dataTable(headerRow, rows, colWidths) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        tableHeader: true,
+        children: headerRow.map((t, i) => cell(t, { header: true, width: colWidths[i] })),
+      }),
+      ...rows.map(
+        (r, ri) =>
+          new TableRow({
+            children: r.map((t, i) => cell(t, { width: colWidths[i], shade: ri % 2 === 1, center: i > 0 })),
+          })
+      ),
+    ],
+  });
+}
+
+function tableCaption(text) {
+  return new Paragraph({
+    spacing: { before: 100, after: 220 },
+    children: [new TextRun({ text, italics: true, size: 19 })],
+  });
+}
 
 const doc = new Document({
   numbering: {
@@ -150,8 +242,20 @@ const doc = new Document({
 
       h2("4.1 System Architecture"),
       body("The model follows Hackel et al. [6] directly. It has two starting components, each already pretrained on other data before this project’s own training begins: a text-understanding component (BERT-Tiny — specifically the official Google-released checkpoint google/bert_uncased_L-2_H-128_A-2, checked to match the paper’s exact specification of 2 layers, 128 internal dimensions, and 2 attention heads), and an image-understanding component (a small pretrained image model, with XCiT-Nano used as the main choice since it performed best in the original paper, and two alternatives, DeiT-Tiny and MobileViT-S, also implemented). Both components are fine-tuned during training rather than kept frozen or trained from a blank slate, following the evidence discussed in Section 2.6. Their two outputs are then combined — either by a simple elementwise product in the reproduced baseline, or by a more elaborate combination step (described below) in this project’s own experimental version — and the combined result is passed to a small final layer that picks the most likely answer out of the 1,000 most common answers seen in training — a multiple-choice design rather than one that writes free-form sentences. This is a deliberate choice, not a shortcut: a model able to write any sentence needs several billion adjustable parameters and correspondingly more training data and compute, which this project’s available GPU time on a shared university cluster does not support; picking from a fixed list is what lets a model of this size be trained fully, by one person, within a semester. The baseline version of the whole model has 8,217,896 adjustable parameters in total, closely matching the 8.1 million reported in the original paper; the experimental version, which adds the more elaborate combination step, has 9,269,544."),
+      ...figure(
+        "fig-architecture.png",
+        560,
+        "System architecture. The image and text encoders each produce their own pretrained representation; the fusion step (elementwise product or cross-attention) is the one component swapped between the reproduced baseline and this project's own experimental version; a small classifier then scores 1,000 possible answers."
+      ),
       body("The training and testing code is written so the exact same code works on a plain laptop CPU or on a proper GPU without any changes — a single function checks whether a GPU is available and uses it automatically, falling back to the CPU otherwise. This let the whole pipeline — loading the data, preparing the text and images, running one training step, saving a checkpoint file, and testing the model’s accuracy — be fully checked and debugged on the development laptop’s CPU before any of it touched the institute’s shared GPU cluster, so that GPU time was not spent finding basic bugs."),
       body("A separate piece of software was also built earlier in the project: a working website (covering user accounts and permissions, plus uploading and managing satellite images). It is built with a clear separation between its different internal layers, checked automatically so that a lower-level part of the code can never accidentally depend on a higher-level one. Once the trained model produced a working checkpoint, this website was extended with a third layer that actually serves the model: given an uploaded image and a plain-English question, it returns an answer, its confidence, and — since the whole point of this project’s own experiment is comparing two versions of the model — both trained versions’ answers side by side when both are available, not just one. This is real, working, tested software, and it is how the trained model is actually meant to be used and demonstrated, not only reported on in numbers. A visual front end, an interactive map, and a results dashboard were then built on top of it (Section 6.2), so the whole system can be shown live."),
+
+      ...figure("01-signin-fixed.jpg", 480, "The application's sign-in page."),
+      ...figure(
+        "04-workspace-answer.jpg",
+        480,
+        "The question workspace: both trained models answer the same question about the same held-out image side by side, each with a confidence score and runner-up answers."
+      ),
 
       h2("4.2 Original Contribution: Comparing Two Ways to Combine Image and Question"),
       body("This project’s own original contribution is a direct, fair comparison between two different ways of combining the image and the question, using identical data, identical starting components, and identical training settings — changing only the one thing being tested. The baseline reproduces LiT-4-RSVQA’s own method: both the image result and the question result are resized to the same length and then multiplied together position by position, a simple but effective combination. The experimental version replaces this with a cross-attention step, in which every word of the question is allowed to directly “look at” every small patch of the image and decide which patches matter most, before the two are combined — a more elaborate mechanism reviewed generally in Lu et al. [13]. Because everything else about the two versions is kept identical, any difference in the final accuracy can be attributed specifically to this one change. This is meant to be a genuine, honestly reported comparison: if the more elaborate combination step does not actually do better than the simple one, that is still a real and useful result, not a failed experiment."),
@@ -165,6 +269,19 @@ const doc = new Document({
       body("The first version of the comparison experiment scored only 36.06% overall accuracy on the test split (27.07% average) — about half the baseline — and its training never improved: validation accuracy stayed at the same one or two values from the first epoch to the last. That pattern suggests a model that gives nearly the same answer whatever it is asked, so the cause was investigated rather than the number being reported as a finding about cross-attention. The cause was a flaw in this project’s own design of the step. The image and the question had each been squashed down to a single list of numbers before being combined, so the “look at the image” step had only one thing to look at — and when there is only one thing to look at, the weighting is always exactly 100% no matter what the question says. The question therefore had no influence at all on the model’s output. This was confirmed directly: changing the question changed the step’s output by exactly zero, while changing the image changed it. The fix was to keep the image and the question as sequences of pieces and let every word of the question look at all of the image’s patches. The model’s structure was reworked so that each combination method is chosen in one place, instead of being swapped in separately by the training, testing, and website code (which is how the flaw had gone unnoticed), and an automated test now checks that both the question and the image genuinely change a combination step’s output. The corrected version was retrained on the cluster and tested (Section 4.4); the first attempt’s saved files were kept as evidence. The episode is a useful reminder that a training run that finishes without errors is not evidence that the model is doing what it was designed to do."),
 
       h2("4.4 Evaluation Plan"),
+      dataTable(
+        ["Test accuracy (RSVQA-LR, 9,838 Qs)", "Baseline (elementwise)", "Cross-attention", "No image (guess)"],
+        [
+          ["Overall", "72.74%", "72.33%", "70.42%"],
+          ["Average (paper's metric)", "75.16%", "72.29%", "64.84%"],
+          ["Rural / urban (100 Qs)", "92.0%", "81.0%", "56.0%"],
+          ["Presence (2,955 Qs)", "90.7%", "90.2%", "88.3%"],
+          ["Comparison (4,002 Qs)", "90.4%", "89.2%", "87.1%"],
+          ["Counting (2,781 Qs)", "27.5%", "28.8%", "28.0%"],
+        ],
+        [40, 20, 20, 20]
+      ),
+      tableCaption("Table 1. Held-out test accuracy, original single-dataset models. \"No image\" is a predictor that never sees the picture and answers each question with its most common training answer for that exact wording."),
       body("The trained model is tested on RSVQA-LR’s held-out validation and test data — data it never saw during training, used specifically to check how well it generalises. Four numbers are recorded: overall accuracy (the plain percentage of questions answered correctly), average accuracy (the accuracy for each of the four question types — presence, count, comparison, and rural/urban — averaged together equally, matching exactly how the original LiT-4-RSVQA paper reports its own results, so this project’s numbers can be compared directly against a published result), accuracy broken down by question type individually, and the total parameter count."),
       body("The baseline (simple combination) configuration has been trained and tested. On the true held-out test split (9,838 examples, after 166 examples with answers outside the 1,000-answer vocabulary were excluded, consistent with the vocabulary being built from the training split only), it reached 72.74% overall accuracy and 75.16% average accuracy — above the paper’s own reported 64.61%, though this is not a strictly like-for-like comparison, since the published result was obtained on a much larger training set (RSVQAxBEN, roughly 15 million examples derived from BigEarthNet-S2) rather than RSVQA-LR directly. Accuracy by question type was uneven: 92.0% on rural/urban, 90.7% on presence, 90.4% on comparison, but only 27.5% on count — consistent with counting being the hardest question type for this kind of model across the wider VQA literature reviewed in Section 2, not a defect specific to this implementation. The experimental (more elaborate combination) version, trained and tested under identical conditions, reached 72.33% overall accuracy and 72.29% average accuracy on the same test split, with 9,269,544 parameters (about 13% more than the baseline). By question type it scored 81.0% on rural/urban, 90.2% on presence, 89.2% on comparison, and 28.8% on count, against the baseline’s 92.0%, 90.7%, 90.4%, and 27.5%. The two versions are effectively level overall, 0.4 percentage points (about 40 of the 9,838 questions) apart. The larger gap in average accuracy comes from the rural/urban type, which has only 100 test questions but counts for a quarter of the average: the baseline answering 11 more of those correctly moves the average by almost three points. On the three large question types the two versions are within about 1.3 points of each other either way, with the experimental version slightly ahead on counting. Each version was trained only once, so differences this small should not be read as evidence that either method is better. The honest conclusion is that, in this setup, the more elaborate cross-attention combination did not measurably improve on the simple baseline, while costing about 13% more parameters. Repeating each run with several different random starting points, to measure how much results vary from run to run, is named as future work."),
 
@@ -175,7 +292,21 @@ const doc = new Document({
       body("The robustness study applied controlled changes to the same held-out test images and re-asked the same questions, comparing each altered answer against the answer on the unchanged image. Some changes cannot change the true answer (reducing brightness, halving the resolution, or mirroring or rotating an image for a question that does not refer to a direction, such as “is this rural or urban” rather than “is there a road on the left”); one change, zooming in, can change the true answer, so it was read differently. The result exposed a real weakness: reducing the baseline’s image brightness alone dropped its rural/urban accuracy from 92.0% to 62.0%, and halving the image’s resolution dropped it to 58.0% — close to the 56.0% a model gets by ignoring the image entirely. On the other, larger question types, accuracy barely moved only because most of it never came from the image in the first place, but a closer measure showed the same weakness: about 13% of the baseline’s answers changed under a mirror or a rotation that could not have changed the true answer, meaning the model was not looking at the scene the way a person would. Mirroring and rotating did not hurt rural/urban accuracy specifically, which showed the weakness was to the image’s appearance and scale, not to its geometry."),
       body("Both models were therefore retrained on RSVQA-LR together with a second dataset, RSVQA-HR (Lobry et al. [3], the same paper family as RSVQA-LR): about 1.07 million question-answer pairs over 15-centimetre aerial photography of the north-eastern United States, collected independently of RSVQA-LR’s 10-metre Sentinel-2 imagery of the Netherlands, and including its own held-out test set from a city, Philadelphia, that appears nowhere else in either dataset. Training also added label-preserving image augmentation — random changes to brightness, contrast, saturation, and resolution, and mirroring or rotating images for questions whose true answer does not depend on direction — so the model would see many appearances of the same underlying scene rather than one fixed one. A resumable training script was written so a job could save its exact progress and continue from the same point after being stopped by the cluster’s four-hour job time limit, verified by deliberately interrupting and resuming a run before it was trusted on the cluster."),
       body("On RSVQA-LR’s own test split, the retrained models cost almost nothing against the original single-dataset numbers in Section 4.4: the simple-combination version moved from 72.74% to 72.02% overall accuracy, and the cross-attention version moved from 72.33% to 71.96% — differences smaller than the gap between the two combination methods themselves. On RSVQA-HR’s own test cities, the two versions reached 81.9% and 80.4% overall accuracy; on Philadelphia, the city neither model saw during training in any form, they reached 77.2% and 74.4%. A gap of five to six percentage points between a dataset’s own test cities and a genuinely unseen city is a real but modest cost of generalising, not a collapse to guessing — and it is the actual evidence that these models are useful beyond a small, selected set of images from one dataset, for both combination methods."),
+      dataTable(
+        ["Test accuracy", "RSVQA-LR (9,838 Qs)", "RSVQA-HR, own cities (189,617 Qs)", "RSVQA-HR, Philadelphia — unseen city (90,112 Qs)"],
+        [
+          ["Elementwise — overall / average", "72.02% / 73.65%", "81.9% / 81.4%", "77.2% / 76.5%"],
+          ["Cross-attention — overall / average", "71.96% / 73.91%", "80.4% / 79.9%", "74.4% / 73.8%"],
+        ],
+        [28, 24, 24, 24]
+      ),
+      tableCaption("Table 2. Accuracy of the widened models on three held-out test sets. Philadelphia never appears in training, in any form, for either dataset."),
       body("The robustness weakness itself was also directly re-measured, using the same perturbations on the same RSVQA-LR test images. For the simple-combination model, the same reduced-brightness test that had dropped rural/urban accuracy from 92.0% to 62.0% now costs nothing at all — 88.0% clean, 88.0% darkened — and halved resolution costs 3 points (85.0%) rather than 34. For the cross-attention model, the same darkening test improves from a 15-point drop (81.0% to 66.0%) to a 3-point drop (89.0% to 86.0%), though halved resolution still costs about 8 points, an honest partial result rather than a complete fix. Taken together, the widened training turned a measured weakness into a mostly-fixed one for both combination methods, and it confirms that this project’s central comparison — whether cross-attention measurably improves on the simple baseline — reaches the same conclusion (no measurable improvement) under a training setup materially different from the one it was first observed under, which is stronger evidence than either result alone."),
+      ...figure(
+        "fig-robustness-chart.png",
+        480,
+        "Rural/urban accuracy under image perturbation, before and after widening the training data (elementwise fusion). The darker-image drop, the clearest sign of the original weakness, shrinks from 30 points to essentially zero."
+      ),
 
       // ---------------- 5. Expected Outcomes ----------------
       h1("5. Expected Outcomes"),
@@ -204,10 +335,16 @@ const doc = new Document({
       h2("6.2 Website / Interface Track"),
       bullet("Module 1 — User accounts, permissions, and an activity log. Complete: over a hundred automated tests passing."),
       bullet("Module 2 — Satellite image handling (uploading, checking the file is genuinely the type it claims to be, reading its location data, generating preview thumbnails). Complete."),
+      ...figure("03-library-uploaded.jpg", 460, "The image library after uploading three held-out test scenes."),
       bullet("Module 3/4 — Serving the trained model: given an uploaded image and a plain-English question, returns an answer with a confidence score, and both trained versions’ answers together when more than one is available, so the model comparison that is this project’s own contribution is visible directly in the interface, not only in this report. Complete: both trained versions are loaded and answer questions together, at roughly 0.4 seconds per question on a laptop CPU with one model loaded."),
       bullet("Module 5 — A visual front end: sign-in, an image library with drag-and-drop upload, and a workspace where a question is asked and both models’ answers appear side by side, with a warning when a model is close to guessing. Complete; checked at both desktop and phone widths."),
       bullet("Module 6 — An interactive map view: uploaded images that carry location data are drawn at their true position over a dark or satellite basemap, and can be clicked to open the question workspace. Complete."),
       bullet("Module 7 — A dashboard showing both models’ measured accuracy on the test split, broken down by question type with the number of test questions behind each figure, alongside live usage figures (questions asked, how often the two models agree, average confidence). Complete."),
+      ...figure(
+        "05-dashboard.jpg",
+        400,
+        "The live dashboard: measured accuracy by question type against the no-image floor, and real usage statistics from questions asked in this session."
+      ),
       bullet("Live demonstration — a one-command launcher and a written runbook covering a walkthrough script, the questions that work best on held-out test images, and likely examiner questions with honest answers. Complete."),
 
       new Paragraph({ children: [new PageBreak()] }),
