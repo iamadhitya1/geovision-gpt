@@ -82,6 +82,14 @@ export interface Page<T> {
   limit: number;
 }
 
+export interface AttentionHeatmap {
+  fusion: FusionType;
+  answer: string;
+  confidence: number;
+  grid_size: number;
+  weights: number[]; // grid_size * grid_size, row-major, sums to ~1.0
+}
+
 export interface VqaStats {
   total_questions: number;
   sample_size: number;

@@ -22,6 +22,8 @@ every piece works. This README is the practical runbook.
 | Cross-attention fusion, corrected version (the actual experiment) | **Done** — see "Cross-attention result" below |
 | Widening the model: RSVQA-LR + RSVQA-HR, augmentation (elementwise) | **Done** — generalises to an unseen city, fixes the robustness weakness — see below |
 | Widening the model: cross-attention variant | **Done** — same generalisation and robustness gains as the elementwise version — see below |
+| Significance test on the elementwise-vs-cross-attention tie | **Done** — McNemar's + bootstrap both confirm the overall tie is real, not unmeasured noise — see below |
+| Attention heatmap (cross-attention interpretability) | **Done** — shows where the model looked, verified live to concentrate on the relevant scene content — see below |
 
 ### Baseline result (2026-09-08, job 4297 trained / job 4323 evaluated)
 
@@ -270,6 +272,69 @@ caught this immediately.
 
 The old checkpoints are kept as evidence, not deleted, and this failed run is worth a
 paragraph in the report: it shows why the two fusion styles are not interchangeable.
+
+## Is the "tie" real? A significance test (`scripts/significance_test.py`, 2026-10-01)
+
+Every result above calls elementwise and cross-attention "effectively tied" — a judgement
+based on the gap being small relative to one training run's noise, not a measurement. This
+script makes it a measurement: it runs both currently-deployed widened checkpoints over
+RSVQA-LR's test split, records a right/wrong outcome per question for each model (both share
+one answer vocabulary, so the filtered question set is identical and in the same order for
+both — what makes a *paired* test valid here), then runs two tests.
+
+**McNemar's exact test** — of the 9,838 questions, 582 are "discordant" (the two models
+disagree): elementwise alone got 294 of those right, cross-attention alone got 288. A
+near-50/50 split like that is exactly what you'd expect if the "tie" is real: **p = 0.84**,
+nowhere near significant.
+
+**Paired bootstrap, 10,000 resamples** — the 95% confidence interval on the accuracy gap
+(elementwise − cross-attention) is **[−0.43%, +0.55%]**, comfortably containing zero.
+
+Both tests agree: the overall tie is now a measured result, not an assumption.
+
+**One nuance worth reporting honestly.** Broken down by question type, **comparison**
+questions (4,002 of them, the largest category) show elementwise ahead 89.78% vs. 89.06%,
+**p = 0.048** — just under the conventional 0.05 threshold. Read in isolation that looks like
+a real effect. But four question types were tested here (comp, count, presence,
+rural/urban), and running four tests raises the chance one comes out under 0.05 by chance
+alone; a Bonferroni correction for that requires p < 0.0125 to call a single test
+significant, and 0.048 doesn't clear that bar. The honest framing: **a suggestive signal on
+comparison questions, not a confirmed one** — worth a dedicated follow-up (a repeat run with
+a different seed, specifically on comparison questions) rather than citing as a finding.
+
+| | Overall | Comparison (4,002) | Counting (2,781) | Presence (2,955) | Rural/urban (100) |
+|---|---|---|---|---|---|
+| p-value | 0.836 | **0.048** | 0.390 | 0.512 | 1.000 |
+
+Reproduce: `python scripts/significance_test.py` (~20-25 minutes on a laptop CPU — no
+cluster needed, since it only runs inference on already-trained checkpoints). Results also
+written to `ml/checkpoints/significance_test_widened.json`.
+
+## Seeing where cross-attention looks (attention heatmap, 2026-10-01)
+
+Cross-attention's own mechanism — every question word attending over the image's 196
+patches — was, until now, never actually *shown*. The model computes these weights on every
+forward pass; they just weren't exposed anywhere. `CrossAttentionFusion.forward` and
+`LitRSVQAModel.forward` now accept `return_attention=True` (opt-in, every existing call site
+is unaffected) and return the raw `(B, L, N)` attention weights alongside the logits.
+
+The backend (`TorchVqaModelRunner.explain`, `POST /images/{id}/attention`) averages those
+weights over the question's real (non-padding) words, drops the one summary token XCiT-Nano
+prepends (confirmed against timm's own source, not assumed — see the model_runner.py
+comment), and reshapes the remaining 196 into the image's 14×14 patch grid. The frontend
+renders it as a semi-transparent amber overlay, toggled by a "show where it looked" button on
+the cross-attention answer card — elementwise has no per-patch attention to show, so the
+button only appears on that card.
+
+**This is interpretability, not a detector.** It shows where the model's attention mass went,
+not a verified location for any object — stated plainly in the API response's own docstring
+and the domain entity's. Verified live: on `237.tif` (urban, correctly answered by both
+models), the heatmap concentrated almost entirely on the single patch covering the image's
+one built-up cluster of buildings — not the surrounding farmland — for the question "is it a
+rural or an urban area?". That's exactly where a person would look to answer that question,
+and it's the first real evidence (beyond the accuracy numbers) that cross-attention's own
+mechanism is doing something sensible, not just computing an expensive no-op that happens to
+match elementwise's accuracy.
 
 ## Setup
 

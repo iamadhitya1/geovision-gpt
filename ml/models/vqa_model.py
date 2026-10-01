@@ -149,18 +149,35 @@ class CrossAttentionFusion(nn.Module):
         self.norm = nn.LayerNorm(fusion_dim)
         self.output_dim = fusion_dim
 
-    def forward(self, image_tokens: Tensor, text_tokens: Tensor, text_mask: Tensor) -> Tensor:
+    def forward(
+        self,
+        image_tokens: Tensor,
+        text_tokens: Tensor,
+        text_mask: Tensor,
+        *,
+        return_attention: bool = False,
+    ) -> Tensor | tuple[Tensor, Tensor]:
         """``image_tokens`` (B, N, image_dim), ``text_tokens`` (B, L, text_dim),
-        ``text_mask`` (B, L) with 1 for real words and 0 for padding."""
+        ``text_mask`` (B, L) with 1 for real words and 0 for padding.
+
+        ``return_attention=True`` additionally returns the (B, L, N) attention weights —
+        how much each question word attended to each image token — for the interpretability
+        view (see ``docs/presenters-guide.html`` "attention heatmap"). Off by default so every
+        existing call site (training, evaluation) is unaffected."""
         image_kv = self.image_proj(image_tokens)  # (B, N, F): what each image region offers
         text_q = self.text_proj(text_tokens)  # (B, L, F): what each word is looking for
-        attended, _ = self.cross_attn(query=text_q, key=image_kv, value=image_kv)
+        attended, attn_weights = self.cross_attn(
+            query=text_q, key=image_kv, value=image_kv, need_weights=return_attention
+        )
         # Residual: each word keeps its own meaning alongside what it found in the image.
         fused_tokens = self.norm(text_q + attended)  # (B, L, F)
 
         # Average over real words only, so padding never dilutes the question's vector.
         mask = text_mask.unsqueeze(-1).to(fused_tokens.dtype)
-        return (fused_tokens * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1.0)
+        pooled = (fused_tokens * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1.0)
+        if return_attention:
+            return pooled, attn_weights  # attn_weights: (B, L, N), averaged over heads
+        return pooled
 
 
 class Classifier(nn.Module):
@@ -207,14 +224,39 @@ class LitRSVQAModel(nn.Module):
             self.config.dropout,
         )
 
-    def forward(self, pixel_values: Tensor, input_ids: Tensor, attention_mask: Tensor) -> Tensor:
+    def forward(
+        self,
+        pixel_values: Tensor,
+        input_ids: Tensor,
+        attention_mask: Tensor,
+        *,
+        return_attention: bool = False,
+    ) -> Tensor | tuple[Tensor, Tensor]:
+        """``return_attention=True`` is only meaningful with cross-attention fusion loaded —
+        it additionally returns the fusion's (B, L, N) attention weights alongside the
+        logits, for the attention-heatmap interpretability view. Raises if the loaded
+        fusion is elementwise, which has no per-patch attention to return; callers should
+        check ``isinstance(model.fusion, CrossAttentionFusion)`` first."""
         if isinstance(self.fusion, CrossAttentionFusion):
+            if return_attention:
+                fused, attn_weights = self.fusion(
+                    self.image_encoder.forward_tokens(pixel_values),
+                    self.text_encoder.forward_tokens(input_ids, attention_mask),
+                    attention_mask,
+                    return_attention=True,
+                )
+                return self.classifier(fused), attn_weights
             fused = self.fusion(
                 self.image_encoder.forward_tokens(pixel_values),
                 self.text_encoder.forward_tokens(input_ids, attention_mask),
                 attention_mask,
             )
         else:
+            if return_attention:
+                raise ValueError(
+                    "return_attention=True needs cross-attention fusion — elementwise fusion "
+                    "has no per-patch attention weights to return."
+                )
             fused = self.fusion(
                 self.image_encoder(pixel_values), self.text_encoder(input_ids, attention_mask)
             )

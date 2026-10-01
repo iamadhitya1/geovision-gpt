@@ -15,8 +15,8 @@ A 6–8 minute walkthrough of GeoVisionGPT, plus what to do when something goes 
    frontend (`:3000`), and opens the browser. Wait until the browser shows the sign-in page.
 3. Sign in with an account you created beforehand. Check the top-right pill says
    **"2 of 2 models online"**. If it says 1 or 0, see *If something breaks* below.
-4. Have these test images ready in a folder (all from `ml/dataset/rsvqa_lr/images/Images_LR/`,
-   all from the held-out **test** split — the models never saw them in training):
+4. The test images are on the **Desktop, in `GeoVisionGPT Demo Images`** — no need to dig into
+   the repo. All from the held-out **test** split (the models never saw them in training):
    `237.tif` (urban), `246.tif` (rural), `315.tif` (farmland). Spare: `235.tif` (rural).
    **Don't use `243.tif`** — re-verified 2026-09-24 against the current widened models and the
    two now disagree on it (elementwise: urban 71%; cross-attention: rural 59%). Genuinely
@@ -46,7 +46,17 @@ area?" (verified live 2026-09-24 against the current widened models):
 | `246.tif` | rural | rural, 100% | rural, 99% |
 
 "Same question, two images, two different answers — so it's reading the picture, not just the
-words." Then, on `315.tif`, show a few presence/comparison questions (both models answer all of
+words."
+
+**3b. Where did it look? (1 min, on `237.tif`).** Click **"show where it looked"** on the
+cross-attention card. Verified live 2026-10-01: the heatmap lights up almost entirely on the
+single patch covering the image's one built-up cluster of buildings — not the surrounding
+farmland. "This isn't a detector — it's showing the model's own attention weights, which it
+computes anyway on every answer. But it's the first real evidence that cross-attention is
+actually looking at the relevant part of the scene, not just coincidentally matching the
+other model's accuracy." Click again to hide it before moving on.
+
+Then, on `315.tif`, show a few presence/comparison questions (both models answer all of
 these correctly, verified live 2026-09-24):
 
 | Question | Expected | Elementwise | Cross-attention |

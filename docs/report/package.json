@@ -3,5 +3,8 @@
   "dependencies": {
     "docx": "^9.7.1",
     "image-size": "^2.0.4"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }

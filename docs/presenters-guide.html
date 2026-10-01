@@ -395,7 +395,7 @@
     <div class="meta-row">
       <span>STATUS: MODEL TRAINED &amp; TESTED · WIDENED FOR GENERALISATION · WEB APP COMPLETE · DEMO-READY</span>
       <span>REPO: geovision-gpt</span>
-      <span>UPDATED 2026-09-24</span>
+      <span>UPDATED 2026-10-01</span>
     </div>
   </div>
 </header>
@@ -498,6 +498,7 @@
             <tr><td class="num">12</td><td class="num">21 Sep</td><td class="name">Backup and documentation</td><td class="scope">Private GitHub repo, restore-tested</td></tr>
             <tr><td class="num">13</td><td class="num">22–23 Sep</td><td class="name">Widening the model: elementwise fusion</td><td class="scope">No regression on RSVQA-LR; generalises to an unseen city; robustness fixed (62%→88%)</td></tr>
             <tr><td class="num">14</td><td class="num">23–24 Sep</td><td class="name">Widening the model: cross-attention fusion</td><td class="scope">Same generalisation and robustness gains confirmed; still tied with elementwise</td></tr>
+            <tr><td class="num">15</td><td class="num">1 Oct</td><td class="name">Significance test + attention heatmap</td><td class="scope">Tie confirmed statistically (p=0.84); cross-attention's focus shown live, concentrated correctly</td></tr>
           </tbody>
         </table>
       </div>
@@ -654,6 +655,35 @@
             <li>Same setup: RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, one training job, evaluated on all three test sets, then robustness-checked with the same perturbations as Step 11.</li>
           </ul>
           <p class="result"><strong>Result:</strong> 71.96% / 73.91% on RSVQA-LR — still tied with elementwise (72.02% / 73.65%), confirming the richer fusion still doesn't measurably help after widening. The unseen-city gap is about 6 points (80.4%→74.4%), the same size as elementwise's — so both fusion styles generalise similarly. The robustness fix holds too: rural/urban's darker-image drop shrinks from 15 points (original cross-attention model) to 3. Both widened models now run side by side in the live app.</p>
+        </li>
+
+        <li>
+          <span class="when">Step 15 · 1 October</span>
+          <h3>Turning two intuitions into measurements: significance testing and an attention heatmap</h3>
+          <ul>
+            <li><strong>Why:</strong> every "tied" claim in this project rested on judgement
+              ("a gap this small, from one training run, shouldn't be read as evidence"), not a
+              measurement. And cross-attention's own mechanism — per-patch attention weights —
+              was computed on every answer but never actually shown, so "does it look at
+              something sensible" had no evidence either way.</li>
+            <li><strong>Significance test</strong> (<code>scripts/significance_test.py</code>):
+              McNemar's exact test and a 10,000-resample paired bootstrap, run over all 9,838
+              RSVQA-LR test questions for both widened models. Confirms the tie directly: p=0.84,
+              95% CI on the gap is [−0.43%, +0.55%]. One honest nuance surfaced by testing each
+              question type separately: comparison questions show a borderline signal (p=0.048)
+              favouring elementwise, but it doesn't survive correcting for testing four types at
+              once (needs p&lt;0.0125) — reported as suggestive, not confirmed.</li>
+            <li><strong>Attention heatmap:</strong> the model already computes how much each of
+              196 image patches mattered to a question — previously discarded right after use.
+              Exposed end to end (model → backend → a toggleable overlay on the cross-attention
+              answer card) without touching any existing call site's behaviour.</li>
+          </ul>
+          <p class="result"><strong>Result:</strong> both tests done on the exact checkpoints the
+            app serves. The heatmap was verified live on a correctly-answered rural/urban
+            question: attention concentrated almost entirely on the scene's one built-up cluster,
+            not the surrounding farmland — the first real evidence cross-attention's extra
+            machinery does something sensible, not just an expensive no-op that happens to match
+            elementwise's accuracy.</p>
         </li>
       </ol>
     </section>
@@ -856,6 +886,7 @@
             <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (elementwise), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Original single-dataset training (superseded, kept for reference)</td><td class="scope">10 epochs, about 73–91 minutes each. Elementwise 72.74% / 75.16%, cross-attention 72.33% / 72.29% on RSVQA-LR's test split — see §06 for the robustness weakness this exposed</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Widened training — what the app serves</td><td class="scope">Both fusions retrained on RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, about 95 minutes each. No regression on RSVQA-LR, generalises to an unseen city, and the robustness weakness is fixed — full numbers in §06</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Significance test + attention heatmap</td><td class="scope">McNemar's test + bootstrap confirm the elementwise/cross-attention tie (p=0.84); cross-attention's per-patch attention exposed as a live, toggleable heatmap on the answer card</td><td><span class="pill live">Done</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -929,6 +960,15 @@
           negative result than a single comparison would be. You can't say either fusion is
           better. Counting is weak for both (about 28%), consistent with it being the hardest
           question type for small VQA models generally.</p>
+        <p><strong>This is no longer just an impression — it's measured.</strong> A significance
+          test (McNemar's exact test, plus a 10,000-resample paired bootstrap, both over all
+          9,838 test questions) confirms the tie directly: p = 0.84, and the 95% confidence
+          interval on the accuracy gap is [−0.43%, +0.55%] — comfortably containing zero. One
+          honest nuance: broken down by question type, comparison questions alone show a
+          borderline result (elementwise ahead, p = 0.048) — but that doesn't survive correction
+          for testing four question types at once (needs p &lt; 0.0125), so it's a suggestive
+          signal worth a follow-up, not a confirmed finding. Reproduce with
+          <code>python scripts/significance_test.py</code>.</p>
         <p><strong>Against the paper.</strong> The paper reports 64.61%; these models are
           higher, but it trained on a much larger dataset (RSVQAxBEN, ~15M examples) and these
           train on RSVQA-LR directly, so it isn't like-for-like. Don't claim to have beaten it.</p>
@@ -974,6 +1014,22 @@
           dramatically for both fusions. Half-resolution improved for elementwise but not for
           cross-attention — worth naming as an honest partial limit rather than claiming a
           complete fix on every axis.</p>
+
+        <h3>Seeing where cross-attention actually looks</h3>
+        <p>Cross-attention computes, on every single answer, how much each of the image's 196
+          patches mattered to the question — that's literally what the mechanism is. Until now
+          that number was thrown away right after use. It's now exposed end to end: the model
+          can return it on request, the backend turns it into a 14×14 grid, and the app renders
+          it as a toggleable heatmap overlay on the cross-attention answer card ("show where it
+          looked"). Elementwise has no per-patch attention, so the button only appears on the
+          cross-attention side.</p>
+        <p><strong>This is interpretability, not a detector</strong> — it shows where the
+          model's attention mass went, not a verified object location, and the app says so.
+          Verified live: on a correctly-answered "is it a rural or an urban area?" question, the
+          heatmap concentrated almost entirely on the single patch covering the scene's one
+          built-up cluster — not the surrounding farmland. That's the first real evidence, beyond
+          matching accuracy, that cross-attention's extra machinery is doing something sensible
+          rather than just computing an expensive no-op.</p>
 
         <h3>What the image actually adds — the number to know</h3>
         <p>A predictor that <strong>never looks at the image</strong> and answers each question with
@@ -1026,9 +1082,10 @@
           <li>In PowerShell, from the project folder, run <code>.\scripts\dev.ps1 demo</code>. Wait
             for the sign-in page, sign in, and check the top-right says
             <strong>"2 of 2 models online"</strong>.</li>
-          <li>Have three files ready from <code>ml/dataset/rsvqa_lr/images/Images_LR/</code>:
-            <code>237.tif</code> (urban), <code>246.tif</code> (rural), <code>315.tif</code>
-            (farmland). All are from the held-out test set. Spare: <code>235.tif</code> (rural).
+          <li>The test images are on the <strong>Desktop, in "GeoVisionGPT Demo Images"</strong> —
+            no need to dig into the repo. <code>237.tif</code> (urban), <code>246.tif</code>
+            (rural), <code>315.tif</code> (farmland). All from the held-out test set. Spare:
+            <code>235.tif</code> (rural).
             <strong>Do not use <code>243.tif</code></strong> — re-verified 2026-09-24, the two
             widened models now disagree on it (elementwise: urban 71%; cross-attention: rural
             59%). Genuinely interesting if it comes up in conversation, but not what you want for
@@ -1048,6 +1105,11 @@
             an urban area?" → both say <em>urban</em> (99% / 79%). Upload 246, same question → both
             say <em>rural</em> (100% / 99%). "Same question, two images, two answers — it's
             reading the picture, not just the words."</li>
+          <li><strong>Where did it look? (1 min, on 237).</strong> Click "show where it looked" on
+            the cross-attention card. Verified live: it lights up almost entirely on the one
+            built-up cluster, not the surrounding farmland. "This is the model's own attention
+            weights, not a detector — but it's the first real evidence cross-attention is looking
+            at the right part of the scene." Click again to hide it before moving on.</li>
           <li><strong>A few more (1 min).</strong> On 315: presence and comparison questions. Say
             plainly: "these are easier — on this dataset the wording alone gets them right most of
             the time."</li>
@@ -1439,6 +1501,33 @@
       </div>
 
       <div class="qa">
+        <p class="q">"Is the two-model 'tie' actually proven, or are you just guessing it's not a
+          real difference?"</p>
+        <p class="a">It's measured now, not guessed. I ran a statistical test — the kind used to
+          check whether two things that look similar are actually the same, or just happened to
+          land close together by chance — over all 9,838 held-out questions. It confirms the tie
+          directly: there's a 95% chance the true difference between the two models is somewhere
+          between a third of a point in either direction, which is about as clean a "no real
+          difference" as you can get. One honest exception: comparison-type questions alone showed
+          a borderline signal favouring the simpler model, but it doesn't survive a standard
+          correction for testing four question types at once — so I report it as "worth checking
+          again," not as a confirmed finding. That distinction — knowing which results survive
+          scrutiny and which don't — is itself part of doing this honestly.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Can you actually show me what the model is looking at?"</p>
+        <p class="a">For the cross-attention model, yes — click "show where it looked" under its
+          answer. The model already calculates, for every answer, how much attention it paid to
+          each small patch of the image; I just exposed that number instead of throwing it away.
+          It's not a bounding box around "the building" — it's a heatmap of where the model's
+          focus went, which is a different, more honest claim. When I tested it live on a rural-vs-
+          urban question, it lit up almost entirely on the one cluster of buildings in the image,
+          not the surrounding fields — which is a real, encouraging sign that it's attending to
+          the right part of the scene, not just getting lucky.</p>
+      </div>
+
+      <div class="qa">
         <p class="q">"Did cross-attention beat the baseline?"</p>
         <p class="a">No — it tied it, both before and after I widened the training data. Most
           recently: 71.96% against 72.02% overall on 9,838 held-out questions. Each model was
@@ -1751,14 +1840,18 @@
 </div>
 
 <footer>
-  Living reference, not a final script. Updated 2026-09-24 with the widened models' real
-  results: both fusions retrained on RSVQA-LR + RSVQA-HR with augmentation (elementwise
-  72.02% / 73.65%, cross-attention 71.96% / 73.91% on the RSVQA-LR test split — the original
-  single-dataset numbers, 72.74% / 75.16% and 72.33% / 72.29%, are kept for reference), the
-  ~5–6 point unseen-city generalisation gap measured on RSVQA-HR's Philadelphia split, and
-  the robustness fix (dimmed-image rural/urban accuracy restored from 62%→88% and 66%→86%).
-  These are the models the live app now serves. The account of the failed first
-  cross-attention run and the completed web app are unchanged. The literature section is
+  Living reference, not a final script. Updated 2026-10-01 with two further results on top
+  of the widened models (elementwise 72.02% / 73.65%, cross-attention 71.96% / 73.91% on the
+  RSVQA-LR test split — original single-dataset numbers, 72.74% / 75.16% and 72.33% / 72.29%,
+  kept for reference): a significance test confirming the elementwise/cross-attention tie
+  directly (McNemar's p=0.84, bootstrap 95% CI [−0.43%, +0.55%]) rather than asserting it from
+  intuition, and a live, toggleable attention heatmap exposing cross-attention's own per-patch
+  weights — verified to concentrate on the relevant part of the scene, not scattered randomly.
+  The ~5–6 point unseen-city generalisation gap (RSVQA-HR's Philadelphia split) and the
+  robustness fix (dimmed-image rural/urban accuracy restored from 62%→88% and 66%→86%) are
+  unchanged from the previous update. These are the models the live app now serves. The
+  account of the failed first cross-attention run and the completed web app are unchanged.
+  The literature section is
   grounded in a read of both originally-assigned surveys — Weng, Pang &amp; Xia (<em>IEEE
   GRSM</em>, Sept 2025) and Kim et al. (<em>ACM Computing Surveys</em>, May 2025) — plus
   Hackel et al. (arXiv:2306.00758) and a literature search run September 2026; page-level

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.domain.entities import (
     AnswerAlternative,
+    AttentionHeatmap,
     AuditEvent,
     ImageMetadata,
     SatelliteImage,
@@ -143,6 +144,18 @@ class AskQuestionRequest(BaseModel):
 
     question: Annotated[str, Field(min_length=1, max_length=500)]
     fusions: list[FusionType] | None = None  # None means "every fusion currently loaded"
+
+
+class ExplainRequest(BaseModel):
+    """Body for the attention-heatmap endpoint — just the question, since this always
+    targets cross-attention specifically (see `AttentionHeatmapRead`)."""
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={"example": {"question": "Is this a rural or an urban area?"}},
+    )
+
+    question: Annotated[str, Field(min_length=1, max_length=500)]
 
 
 # --- Responses ---------------------------------------------------------------
@@ -351,6 +364,41 @@ class VqaAnswerRead(BaseModel):
             answer=answer.answer,
             confidence=answer.confidence,
             alternatives=[AnswerAlternativeRead.from_domain(a) for a in answer.alternatives],
+        )
+
+
+class AttentionHeatmapRead(BaseModel):
+    """A `grid_size` x `grid_size` grid of attention weights, flattened row-major, each in
+    [0, 1] and summing to ~1.0 across the grid — render as a semi-transparent overlay on
+    the source image. Interpretability only: shows where the model attended, not a
+    verified ground-truth location."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "fusion": "cross_attention",
+                "answer": "urban",
+                "confidence": 0.88,
+                "grid_size": 14,
+                "weights": [0.004, 0.004, 0.009, "... 196 values total"],
+            }
+        }
+    )
+
+    fusion: FusionType
+    answer: str
+    confidence: float
+    grid_size: int
+    weights: list[float]
+
+    @classmethod
+    def from_domain(cls, heatmap: AttentionHeatmap) -> AttentionHeatmapRead:
+        return cls(
+            fusion=heatmap.fusion,
+            answer=heatmap.answer,
+            confidence=heatmap.confidence,
+            grid_size=heatmap.grid_size,
+            weights=list(heatmap.weights),
         )
 
 

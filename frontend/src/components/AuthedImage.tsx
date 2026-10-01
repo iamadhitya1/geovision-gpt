@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
@@ -10,11 +11,16 @@ export function AuthedImage({
   alt,
   className,
   scanning = false,
+  overlay,
 }: {
   imageId: string;
   alt: string;
   className?: string;
   scanning?: boolean;
+  /** Rendered absolutely inside this component's own relative wrapper, e.g. an attention
+   * heatmap — the source images are square and object-cover fills a square container
+   * exactly, so an `inset-0` overlay lines up with the rendered image with no extra math. */
+  overlay?: ReactNode;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -46,6 +52,7 @@ export function AuthedImage({
           {failed ? "no preview" : "loading…"}
         </div>
       )}
+      {src && overlay}
     </div>
   );
 }

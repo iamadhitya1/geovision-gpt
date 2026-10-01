@@ -19,6 +19,7 @@ dependencies = [
     "numpy>=1.26.0",
     "pandas>=2.2.0",
     "scikit-learn>=1.5.0",    # accuracy/precision reporting utilities
+    "scipy>=1.13.0",          # McNemar's test / binomial test (scripts/significance_test.py)
     "tqdm>=4.66.0",
     "matplotlib>=3.9.0",      # training-curve and confusion-matrix plots for the report
 ]

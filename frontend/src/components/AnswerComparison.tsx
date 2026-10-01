@@ -5,16 +5,45 @@ import type { VqaAnswer, VqaQuery } from "@/lib/types";
 // confident-looking "yes" doesn't get mistaken for a confident model.
 const LOW_CONFIDENCE = 0.2;
 
-function AnswerColumn({ answer }: { answer: VqaAnswer }) {
+function AnswerColumn({
+  answer,
+  onExplain,
+  explainStatus,
+}: {
+  answer: VqaAnswer;
+  onExplain?: () => void;
+  explainStatus?: "idle" | "loading" | "shown";
+}) {
   const info = MODEL_INFO[answer.fusion];
   const low = answer.confidence < LOW_CONFIDENCE;
   const top = Math.max(answer.confidence, ...answer.alternatives.map((a) => a.confidence));
+  const showExplain = answer.fusion === "cross_attention" && onExplain;
 
   return (
     <div className={`rounded-sm border bg-panel p-4 ${info.border}/30`}>
-      <div className="space-y-0.5">
-        <div className={`font-mono text-[11px] uppercase tracking-wider ${info.text}`}>{info.name}</div>
-        <div className="font-mono text-[10px] uppercase tracking-wider text-faint">{info.short}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-0.5">
+          <div className={`font-mono text-[11px] uppercase tracking-wider ${info.text}`}>{info.name}</div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-faint">{info.short}</div>
+        </div>
+        {showExplain && (
+          <button
+            type="button"
+            onClick={onExplain}
+            disabled={explainStatus === "loading"}
+            className={`shrink-0 rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider transition disabled:opacity-50 ${
+              explainStatus === "shown"
+                ? `${info.border} ${info.text}`
+                : "border-line text-muted hover:border-cross/60 hover:text-text"
+            }`}
+          >
+            {explainStatus === "loading"
+              ? "looking…"
+              : explainStatus === "shown"
+                ? "hide heatmap"
+                : "show where it looked"}
+          </button>
+        )}
       </div>
 
       <div className="mt-3 font-display text-4xl font-bold leading-none tracking-tight text-balance">
@@ -60,7 +89,17 @@ function AnswerColumn({ answer }: { answer: VqaAnswer }) {
   );
 }
 
-export function AnswerComparison({ query }: { query: VqaQuery }) {
+export function AnswerComparison({
+  query,
+  onExplain,
+  explainStatus = "idle",
+}: {
+  query: VqaQuery;
+  /** Omit to hide the "show where it looked" control entirely (e.g. for past/collapsed
+   * questions in history, where re-explaining isn't worth the extra API call). */
+  onExplain?: () => void;
+  explainStatus?: "idle" | "loading" | "shown";
+}) {
   const answers = FUSION_ORDER.map((f) => query.answers.find((a) => a.fusion === f)).filter(
     (a): a is VqaAnswer => a !== undefined,
   );
@@ -71,7 +110,12 @@ export function AnswerComparison({ query }: { query: VqaQuery }) {
     <div className="space-y-3">
       <div className={`grid gap-3 ${both ? "md:grid-cols-2" : ""}`}>
         {answers.map((a) => (
-          <AnswerColumn key={a.fusion} answer={a} />
+          <AnswerColumn
+            key={a.fusion}
+            answer={a}
+            onExplain={a.fusion === "cross_attention" ? onExplain : undefined}
+            explainStatus={explainStatus}
+          />
         ))}
       </div>
       {both && (

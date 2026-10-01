@@ -200,6 +200,25 @@ class VqaAnswer:
     alternatives: tuple[AnswerAlternative, ...]  # ranked, most confident first
 
 
+@dataclass(frozen=True, slots=True)
+class AttentionHeatmap:
+    """Where the cross-attention model looked when answering a question — only this fusion
+    variant has per-patch attention to show; elementwise fusion pools the whole image into
+    one vector before combining, so there's nothing comparable to visualise for it.
+
+    ``weights`` is a flattened ``grid_size`` x ``grid_size`` grid, row-major, averaged over
+    the question's real (non-padding) word tokens and normalised to sum to ~1.0 across the
+    grid. This shows where the model attended, not a verified ground-truth location for any
+    object in the scene — an interpretability aid, not a detector.
+    """
+
+    fusion: FusionType
+    answer: str
+    confidence: float
+    grid_size: int
+    weights: tuple[float, ...]  # length grid_size * grid_size
+
+
 @dataclass(slots=True)
 class VqaQuery:
     """A question asked about a satellite image, and every trained model variant's answer

@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, Query
 from app.api.deps import ResearcherUser, get_request_context, get_vqa_service
 from app.application.dto import (
     AskQuestionRequest,
+    AttentionHeatmapRead,
+    ExplainRequest,
     Page,
     RequestContext,
     VqaQueryRead,
@@ -78,6 +80,31 @@ async def ask_question(
         context=context,
     )
     return VqaQueryRead.from_domain(query)
+
+
+@router.post(
+    "/images/{image_id}/attention",
+    response_model=AttentionHeatmapRead,
+    summary="Where the cross-attention model looked when answering a question",
+    responses={
+        404: {"description": "Image not found, or not owned by the caller"},
+        422: {"description": "The image hasn't finished processing, or processing failed"},
+        503: {"description": "The cross-attention model isn't loaded on this server"},
+    },
+)
+async def explain_attention(
+    image_id: UUID,
+    request: ExplainRequest,
+    researcher: ResearcherUser,
+    service: VqaServiceDep,
+) -> AttentionHeatmapRead:
+    """Cross-attention fusion only — elementwise has no per-patch attention to show, since
+    it pools the whole image into one vector before combining. The returned grid is an
+    interpretability aid (where the model attended), not a verified object location."""
+    heatmap = await service.explain(
+        image_id=image_id, question=request.question, requesting_user=researcher
+    )
+    return AttentionHeatmapRead.from_domain(heatmap)
 
 
 @router.get(

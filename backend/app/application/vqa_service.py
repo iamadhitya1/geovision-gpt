@@ -20,7 +20,7 @@ from app.application.dto import (
     VqaStatsRead,
 )
 from app.core.logging import get_logger
-from app.domain.entities import SatelliteImage, User, VqaAnswer, VqaQuery
+from app.domain.entities import AttentionHeatmap, SatelliteImage, User, VqaAnswer, VqaQuery
 from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageStatus
 from app.domain.errors import ImageNotReadyError, NotFoundError
 from app.domain.interfaces import (
@@ -138,6 +138,21 @@ class VqaService:
             fusions_failed=len(failures),
         )
         return query
+
+    async def explain(
+        self, *, image_id: UUID, question: str, requesting_user: User
+    ) -> AttentionHeatmap:
+        """Cross-attention's attention weights as a heatmap — interpretability only, not
+        persisted as a query (unlike :meth:`ask`): it's a view onto an existing answer, not
+        a new recorded event. Same ownership/readiness checks as asking a question."""
+        image = await self._images.get_by_id(image_id)
+        if image is None or not self._can_access(image, requesting_user):
+            raise NotFoundError("Image not found.", image_id=str(image_id))
+        if image.status is not ImageStatus.READY:
+            raise ImageNotReadyError(image_id=str(image_id), status=image.status.value)
+
+        image_bytes = await self._storage.get(image.storage_key)
+        return await self._model.explain(image_bytes, question)
 
     async def list_for_image(
         self, image_id: UUID, requesting_user: User, *, offset: int = 0, limit: int = 50

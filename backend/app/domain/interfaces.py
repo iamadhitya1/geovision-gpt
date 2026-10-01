@@ -14,6 +14,7 @@ from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from app.domain.entities import (
+    AttentionHeatmap,
     AuditEvent,
     ImageMetadata,
     SatelliteImage,
@@ -177,6 +178,13 @@ class VqaModelPort(Protocol):
         """Raises :class:`~app.domain.errors.ModelUnavailableError` if ``fusion`` isn't
         loaded, and :class:`~app.domain.errors.CorruptImageError` if ``image_data`` can't
         be decoded as an image."""
+        ...
+
+    async def explain(self, image_data: bytes, question: str) -> AttentionHeatmap:
+        """Cross-attention fusion only — raises :class:`~app.domain.errors.ModelUnavailableError`
+        if that fusion isn't loaded (elementwise being loaded doesn't satisfy this; it has no
+        per-patch attention to show), and :class:`~app.domain.errors.CorruptImageError` if
+        ``image_data`` can't be decoded."""
         ...
 
     def available_fusions(self) -> frozenset[FusionType]: ...

@@ -1,4 +1,5 @@
 import type {
+  AttentionHeatmap,
   AuthResponse,
   FusionType,
   Page,
@@ -165,6 +166,10 @@ export const api = {
     request<VqaQuery>(`/images/${imageId}/ask`, json("POST", { question })),
 
   history: (imageId: string) => request<Page<VqaQuery>>(`/images/${imageId}/vqa?limit=50`),
+
+  /** Cross-attention only — see AttentionHeatmap. 503 if that fusion isn't loaded. */
+  explainAttention: (imageId: string, question: string) =>
+    request<AttentionHeatmap>(`/images/${imageId}/attention`, json("POST", { question })),
 
   /** The thumbnail endpoint needs the bearer header, which an <img src> can't send. */
   thumbnailBlob: async (id: string): Promise<Blob> => {

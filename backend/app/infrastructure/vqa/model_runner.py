@@ -18,6 +18,7 @@ from typing import Any
 import torch
 from dataset.rsvqa_lr_dataset import AnswerVocabulary
 from models.vqa_model import (
+    CrossAttentionFusion,
     ImageEncoderName,
     LitRSVQAModel,
     build_image_transform,
@@ -26,9 +27,14 @@ from models.vqa_model import (
 from PIL import Image, UnidentifiedImageError
 
 from app.core.logging import get_logger
-from app.domain.entities import AnswerAlternative, VqaAnswer
+from app.domain.entities import AnswerAlternative, AttentionHeatmap, VqaAnswer
 from app.domain.enums import FusionType
 from app.domain.errors import CorruptImageError, ModelUnavailableError
+
+# XCiT-Nano prepends one summary ("class") token at index 0 before its 196 real patch
+# tokens (confirmed against timm's xcit.py source, not assumed) — the heatmap drops that
+# one and reshapes the remaining 196 into the image's 14x14 patch grid.
+_ATTENTION_GRID_SIZE = 14
 
 logger = get_logger(__name__)
 
@@ -157,4 +163,52 @@ class TorchVqaModelRunner:
             answer=alternatives[0].answer,
             confidence=alternatives[0].confidence,
             alternatives=alternatives,
+        )
+
+    async def explain(self, image_data: bytes, question: str) -> AttentionHeatmap:
+        if FusionType.CROSS_ATTENTION not in self._models or self._vocab is None:
+            raise ModelUnavailableError(fusion=FusionType.CROSS_ATTENTION.value)
+
+        return await asyncio.to_thread(self._explain_sync, image_data, question)
+
+    def _explain_sync(self, image_data: bytes, question: str) -> AttentionHeatmap:
+        assert self._vocab is not None  # checked in explain()
+        try:
+            image = Image.open(io.BytesIO(image_data)).convert("RGB")
+        except UnidentifiedImageError as exc:
+            raise CorruptImageError(
+                "Couldn't decode this image for the model — it may not actually be a "
+                "valid raster despite passing upload validation."
+            ) from exc
+
+        model = self._models[FusionType.CROSS_ATTENTION]
+        assert isinstance(model.fusion, CrossAttentionFusion)  # guaranteed by how it was loaded
+        transform = self._transform_for(self._model_encoders[FusionType.CROSS_ATTENTION])
+        pixel_values = transform(image).unsqueeze(0).to(self._device)
+
+        tokenizer = self._tokenizer_instance()
+        encoded = tokenizer([question], padding=True, truncation=True, return_tensors="pt")
+        input_ids = encoded["input_ids"].to(self._device)
+        attention_mask = encoded["attention_mask"].to(self._device)
+
+        with torch.no_grad():
+            logits, attn = model(pixel_values, input_ids, attention_mask, return_attention=True)
+            probabilities = torch.softmax(logits, dim=-1)[0]
+
+            # attn: (1, L, N) — average over real question words only, same masking logic
+            # as the fusion's own pooling step, so padding never dilutes the heatmap.
+            mask = attention_mask[0].to(attn.dtype)  # (L,)
+            per_patch = (attn[0] * mask.unsqueeze(-1)).sum(dim=0) / mask.sum().clamp(min=1.0)
+            patch_weights = per_patch[1:]  # drop index 0, the summary token — see module docstring
+            # Renormalise over the 196 real patches alone, since the summary token also
+            # absorbed some attention mass that a patch-only heatmap shouldn't silently drop.
+            patch_weights = patch_weights / patch_weights.sum().clamp(min=1e-8)
+
+        top_prob, top_index = torch.topk(probabilities, k=1)
+        return AttentionHeatmap(
+            fusion=FusionType.CROSS_ATTENTION,
+            answer=self._vocab.decode(int(top_index.item())),
+            confidence=float(top_prob.item()),
+            grid_size=_ATTENTION_GRID_SIZE,
+            weights=tuple(patch_weights.tolist()),
         )

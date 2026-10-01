@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AnswerComparison } from "@/components/AnswerComparison";
+import { AttentionOverlay } from "@/components/AttentionOverlay";
 import { AuthedImage } from "@/components/AuthedImage";
 import { api, ApiError } from "@/lib/api";
 import { FUSION_ORDER, MODEL_INFO, SUGGESTED_QUESTIONS, formatBytes } from "@/lib/models";
-import type { SatelliteImage, VqaQuery } from "@/lib/types";
+import type { AttentionHeatmap, SatelliteImage, VqaQuery } from "@/lib/types";
 
 function centreOf(bounds: [number, number, number, number]): string {
   const [minX, minY, maxX, maxY] = bounds;
@@ -50,6 +51,8 @@ export default function WorkspacePage() {
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [heatmap, setHeatmap] = useState<AttentionHeatmap | null>(null);
+  const [explaining, setExplaining] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +76,7 @@ export default function WorkspacePage() {
       if (!trimmed || asking) return;
       setError(null);
       setAsking(true);
+      setHeatmap(null); // a new question invalidates any heatmap shown for the old one
       try {
         const result = await api.ask(id, trimmed);
         setQueries((prev) => [result, ...prev]);
@@ -84,6 +88,25 @@ export default function WorkspacePage() {
       }
     },
     [id, asking],
+  );
+
+  const toggleExplain = useCallback(
+    async (forQuestion: string) => {
+      if (heatmap) {
+        setHeatmap(null);
+        return;
+      }
+      setExplaining(true);
+      try {
+        setHeatmap(await api.explainAttention(id, forQuestion));
+      } catch {
+        // Most likely cross-attention isn't loaded on this server — not worth a loud
+        // error for an optional interpretability extra; the button just resets quietly.
+      } finally {
+        setExplaining(false);
+      }
+    },
+    [id, heatmap],
   );
 
   if (loadError) {
@@ -118,6 +141,7 @@ export default function WorkspacePage() {
                 alt={image.original_filename}
                 className="aspect-square"
                 scanning={asking}
+                overlay={heatmap ? <AttentionOverlay heatmap={heatmap} /> : undefined}
               />
             ) : (
               <div className="flex aspect-square items-center justify-center bg-raised font-mono text-xs text-faint">
@@ -195,7 +219,11 @@ export default function WorkspacePage() {
             <div key={latest.id} className="rise space-y-3">
               <h2 className="font-mono text-[11px] uppercase tracking-wider text-faint">Latest answer</h2>
               <p className="font-display text-xl font-medium tracking-tight">“{latest.question}”</p>
-              <AnswerComparison query={latest} />
+              <AnswerComparison
+                query={latest}
+                onExplain={() => void toggleExplain(latest.question)}
+                explainStatus={explaining ? "loading" : heatmap ? "shown" : "idle"}
+              />
             </div>
           ) : (
             <div className="rounded-sm border border-dashed border-line p-6 text-sm text-muted">

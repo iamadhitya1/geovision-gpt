@@ -14,6 +14,7 @@ from app.application.audit_service import AuditService
 from app.application.vqa_service import VqaService
 from app.domain.entities import (
     AnswerAlternative,
+    AttentionHeatmap,
     AuditEvent,
     SatelliteImage,
     User,
@@ -94,6 +95,19 @@ class FakeVqaModel:
             answer="urban",
             confidence=0.9,
             alternatives=(AnswerAlternative(answer="urban", confidence=0.9),),
+        )
+
+    async def explain(self, image_data: bytes, question: str) -> AttentionHeatmap:
+        if FusionType.CROSS_ATTENTION not in self._loaded:
+            raise ModelUnavailableError(fusion=FusionType.CROSS_ATTENTION.value)
+        grid_size = 14
+        n = grid_size * grid_size
+        return AttentionHeatmap(
+            fusion=FusionType.CROSS_ATTENTION,
+            answer="urban",
+            confidence=0.88,
+            grid_size=grid_size,
+            weights=tuple(1.0 / n for _ in range(n)),
         )
 
 
@@ -272,6 +286,53 @@ async def test_ask_admin_can_query_any_users_image() -> None:
 
     query = await service.ask(image_id=image.id, question="Q", requesting_user=admin)
     assert len(query.answers) == 1
+
+
+async def test_explain_returns_a_full_attention_grid() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.CROSS_ATTENTION}))
+    service = _build_service(image=image, model=model)
+
+    heatmap = await service.explain(image_id=image.id, question="Q", requesting_user=owner)
+
+    assert heatmap.fusion is FusionType.CROSS_ATTENTION
+    assert heatmap.grid_size == 14
+    assert len(heatmap.weights) == 14 * 14
+    assert pytest.approx(sum(heatmap.weights), rel=1e-6) == 1.0
+
+
+async def test_explain_raises_model_unavailable_when_cross_attention_not_loaded() -> None:
+    """Elementwise being loaded doesn't satisfy this — it has no per-patch attention."""
+    owner = _owner()
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE}))
+    service = _build_service(image=image, model=model)
+
+    with pytest.raises(ModelUnavailableError):
+        await service.explain(image_id=image.id, question="Q", requesting_user=owner)
+
+
+async def test_explain_raises_not_found_for_someone_elses_image() -> None:
+    owner = _owner()
+    stranger = User(email="s2@geovisiongpt.io", full_name="S2", password_hash="h", id=uuid4())
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.CROSS_ATTENTION}))
+    service = _build_service(image=image, model=model)
+
+    with pytest.raises(NotFoundError):
+        await service.explain(image_id=image.id, question="Q", requesting_user=stranger)
+
+
+async def test_explain_raises_not_ready_for_an_unprocessed_image() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    image.status = ImageStatus.PROCESSING
+    model = FakeVqaModel(loaded=frozenset({FusionType.CROSS_ATTENTION}))
+    service = _build_service(image=image, model=model)
+
+    with pytest.raises(ImageNotReadyError):
+        await service.explain(image_id=image.id, question="Q", requesting_user=owner)
 
 
 def _answer(fusion: FusionType, text: str, confidence: float) -> VqaAnswer:
