@@ -275,6 +275,13 @@ paragraph in the report: it shows why the two fusion styles are not interchangea
 
 ## Is the "tie" real? A significance test (`scripts/significance_test.py`, 2026-10-01)
 
+> **Superseded (2026-10-08).** This test compares the **seed-0** pair only — one trained model per
+> fusion — so it can show those two models are not distinguishable on these questions, but it cannot
+> see how much a model changes from one training run to the next. Training each fusion three times
+> ("Three training runs each", below) showed that variation is as large as the gap between the
+> fusions, and that across runs the elementwise model is consistently a little ahead. The "tie"
+> below was real for seed 0 and a misleading summary of the two designs.
+
 Every result above calls elementwise and cross-attention "effectively tied" — a judgement
 based on the gap being small relative to one training run's noise, not a measurement. This
 script makes it a measurement: it runs both currently-deployed widened checkpoints over
@@ -335,6 +342,246 @@ rural or an urban area?". That's exactly where a person would look to answer tha
 and it's the first real evidence (beyond the accuracy numbers) that cross-attention's own
 mechanism is doing something sensible, not just computing an expensive no-op that happens to
 match elementwise's accuracy.
+
+## Counting: why "28%" was the wrong number, and what the models actually do (2026-10-06)
+
+Counting looked hopeless: both widened models score ~28% on RSVQA-LR's count questions, which
+is also what "always answer 0" scores (27%). Two things were wrong with reading that as "the
+models can't count":
+
+1. **The metric.** RSVQA-LR's labels are exact integers ("0", "7", "158"…), and exact match
+   is a very harsh test at 10 m per pixel. The original RSVQA paper (Lobry et al., 2020,
+   Section II-B) quantises low-resolution counts into five ranges — 0 / 1–10 / 11–100 /
+   101–1,000 / >1,000 — before scoring, and reports 67.01% on counting that way. Our 28% and
+   its 67% were never measuring the same thing. The ranges live in one shared module,
+   [`dataset/count_ranges.py`](dataset/count_ranges.py), used by both the evaluation scripts
+   and the web app so they can't drift apart.
+2. **The decoding.** The classifier spreads a count question's probability over many exact
+   numbers ("14", "15", "16"…), so "0" — one answer holding a large share of the training
+   labels — can win the argmax even when "somewhere in 11–100" holds far more probability in
+   total. Summing probability per range first, then taking the best range, fixes that. It
+   needs no retraining.
+
+[`scripts/count_bucket_eval.py`](scripts/count_bucket_eval.py), over RSVQA-LR's 2,947 test
+count questions (mean over the training runs; per-run values in "Three training runs each" below):
+
+| | exact number | in ranges, usual argmax | **in ranges, summed per range** |
+|---|---|---|---|
+| Always guess one answer | 27.1% | ≤ 28.6% | — |
+| **No image**: each question's most common range in training | — | **57.9%** | — |
+| Elementwise (3 runs scored with the counting metric: 68.1, 68.5, 67.6 in ranges) | 28.4% | 61.8% | **68.1%** |
+| Cross-attention (3 runs: 61.7, 56.7, 57.4) | 27.9% | 40.2% | **58.6%** ± 2.7 |
+
+How to read it:
+
+- **The image does help on counting, once it's scored sensibly — for elementwise**: it is about 10
+  points above the no-image floor (57.9%). **Cross-attention is only about 1 point above it
+  (58.6%)**: on counting it is roughly no better than guessing from the question alone. The
+  earlier statement that the image adds nothing on counting is true only for exact match.
+- The cross-attention model's low "usual argmax" figure is largely a decoding artefact: it
+  answered "0" for 42–65% of count questions (depending on the run), while only 26% of true answers are 0. Summed
+  per range it recovers about 18 points — but it still trails elementwise by about 10, and
+  that gap **held on every one of its three runs** (61.7, 56.7, 57.4 against 68.1, 68.5 and 67.6), so
+  it is a property of this fusion here, not seed luck.
+- 68.1% vs the paper's 67.01% is **not** a like-for-like comparison (different models,
+  different training data, our answer vocabulary cuts off rare large counts). Don't claim to
+  have beaten it.
+- The web app answers count questions this way ("101 to 1,000 (56%)", with the next-most-likely
+  ranges and a note), and the dashboard shows both the exact-match row and the range row.
+
+Every `evaluate_generalist.py` run now also records these numbers (`lr:test_count_bucketed` in
+`<tag>_best_eval.json`), and `scripts/aggregate_seeds.py` reports their mean ± spread over
+seeds.
+
+## Pointing at the answer: highlighting, and how it differs from the VQA model (2026-10-06/07)
+
+"Is there vegetation? → yes, *here*." The trained VQA model cannot do the "here": it
+classifies, it was never shown a segmentation mask, and none of the datasets used in this
+project contain one. So the web app does this with a **separate step that needs no training
+data of our own**, says on screen which method found each thing, and never presents it as the
+VQA model's doing.
+
+**What an image-only method can honestly find at ~10 m per pixel** — tried with CLIPSeg
+(Lüddecke & Ecker, 2022), a pretrained text-prompted segmenter, on the demo scenes:
+
+| Thing | Image-only result | What the app does |
+|---|---|---|
+| water | Good for open water; bright beach sand also looks like "water" to it, so it is restricted to dark pixels | CLIPSeg + darkness |
+| vegetation (any green) | Good | colour index (excess green, `2G − R − B`) |
+| forest / grass / farmland | **Cannot be told apart**: prompted "forest", CLIPSeg lit up the farmland — and the town | map data; falls back to the colour index (all green) with a caveat |
+| buildings | Shows built-up areas, not buildings | map data; falls back to CLIPSeg with a caveat |
+| roads | **Fails**: about one pixel wide | map data only — no honest image-only fallback |
+| cemetery | **Garbage**: it picked out a beach | map data only |
+
+So for the things the image cannot show, a georeferenced image gets **OpenStreetMap map data**
+drawn at its coordinates (Overpass API; roads, buildings, forest, grass, farmland,
+cemeteries). That is real, precise geometry — and RSVQA's own questions and answers were built
+from OpenStreetMap — but it is **map data, not something the model found in the image**: it can
+be newer or older than the imagery, anything nobody mapped is missing, and roads are drawn wider
+than they are so they can be seen. The panel under the image says so, per layer.
+
+Behaviour worth knowing:
+
+- Whatever the question names is highlighted; a comparison ("more roads than buildings?")
+  highlights **both**, in two colours, with a legend. Size and shape words ("large",
+  "circular") can't be honoured and the response says they weren't used.
+- For a presence or count question the highlight is offered only when the models don't both
+  say "none". For a comparison it is always offered — there a "no" only means one count isn't
+  larger.
+- If map data can't be reached, buildings and the green things fall back to the image (flagged
+  in the caveat); roads and cemeteries say plainly they can't be shown.
+- The free Overpass servers are the least reliable part of the app: the identical query has
+  answered in 1.5 s and then returned a 504 on the next try. The provider asks one request at a
+  time, retries once when told the server is busy, asks for dense layers (buildings) in four
+  smaller pieces, and **caches everything on disk**. `backend/scripts/warm_map_cache.py` fills
+  that cache for the places you'll demo, so they work instantly and offline.
+
+This is **not segmentation accuracy**: no labelled masks were available, so there is no
+measured IoU. It is a demonstrated, honestly-labelled pointer. Code:
+`backend/app/infrastructure/vqa/segmenter.py`, `backend/app/infrastructure/imaging/osm_provider.py`;
+the question → things rule is `backend/app/domain/concepts.py`.
+
+The amber **"show model attention"** overlay on the cross-attention card is a different thing
+and is *not* a locator: it shows where the model's attention weights went while it answered
+(a coarse 14 × 14 grid, averaged over the question's words). On a water question it can light up
+the surrounding green fields — plausibly because the model uses them as context for "no water
+here". It is interpretability only, and the button and a caption beside the image say so.
+
+## Live imagery from the map (2026-10-06)
+
+The Map page's **Analyse this place** fetches a 256 × 256 px, ~10 m per pixel scene from the
+Sentinel-2 cloudless mosaic (EOX IT Services GmbH; free for non-commercial use with
+attribution) — the scale the models were trained on, because the robustness study above shows
+they are fragile to scale and a screenshot of a sharp basemap would mislead them. The scene
+fetched for `237.tif`'s coordinates shows the same town and canal as the real dataset image.
+
+A first look at how the two widened models answer on six such scenes (not a measurement — one
+scene each, no ground truth):
+
+- Elementwise gave the answer a person would on rural/urban for all six, including Ahmedabad's
+  dense centre (urban, 100%) and Mumbai harbour (urban, 88%), and said "no water" for a
+  desert scene (at only 50% confidence).
+- **Cross-attention called Ahmedabad's centre and Mumbai harbour "rural" at 99%.** That is
+  consistent with the robustness findings (it is the more fragile fusion under a change of
+  imagery) and is worth testing properly across seeds rather than waving away.
+
+## Three training runs each (2026-10-05 to 10-08) — and what changed
+
+Every widened-model result earlier in this file came from **one** training run per fusion
+(seed 0). Each fusion was trained twice more with different seeds (`TAG=… EXTRA_ARGS="--seed N"`
+for `train_generalist.sbatch`, evaluated with `evaluate_generalist.sbatch`), and
+`scripts/aggregate_seeds.py` combines them. Overall accuracy, per run:
+
+| Run | Tag | RSVQA-LR | RSVQA-HR | Philadelphia (unseen city) | LR rural/urban (100 Qs) |
+|---|---|---|---|---|---|
+| Elementwise, seed 0 | `gen_xcit` | 72.02 | 81.87 | 77.21 | 88 |
+| Elementwise, seed 1 | `gen_xcit_s1` | 73.30 | 83.35 | 77.01 | 91 |
+| Elementwise, seed 2 | `gen_xcit_s2` | 72.22 | 82.99 | 77.83 | 87 |
+| **Elementwise, mean** | | **72.51 ± 0.69** | **82.74 ± 0.77** | **77.35 ± 0.43** | 88.7 ± 2.1 |
+| Cross-attention, seed 0 | `gen_xcit_xattn` | 71.96 | 80.42 | 74.42 | 89 |
+| Cross-attention, seed 1 | `gen_xcit_xattn_s1` | 70.43 | 76.81 | 76.09 | 78 |
+| Cross-attention, seed 2 | `gen_xcit_xattn_s2` | 71.07 | 78.76 | 77.77 | 54 |
+| **Cross-attention, mean** | | **71.15 ± 0.77** | **78.66 ± 1.80** | **76.09 ± 1.68** | 73.7 ± 17.9 |
+
+(± is the standard deviation across the three runs.) What this does and does not show:
+
+- **The seed-0 "tie" was luck.** Two single runs, 72.02 vs 71.96, looked identical; across three
+  runs the elementwise model is ahead by about **1.4 points on RSVQA-LR** and **4.1 on
+  RSVQA-HR**. On both, **every elementwise run beat every cross-attention run** — on RSVQA-LR by
+  as little as 0.06 points (72.02 vs 71.96), so that edge is small but consistent.
+- **On the unseen city the runs overlap** (the best cross-attention run, 77.77, beat the worst
+  elementwise run, 77.01), so Philadelphia alone does not separate them. The means still favour
+  elementwise (77.4 vs 76.1).
+- **Cross-attention is also less stable**: its standard deviation is 1.1× to 3.9× larger on every
+  test set, and its rural/urban score swung from 54% to 89%. That type has only 100 test
+  questions, so the swing is partly sampling noise — but it is also why cross-attention's
+  *average* accuracy (69.6%) is lower and far noisier than elementwise's (74.2%).
+- **With three runs per side the strongest p-value an exact rank test can give is 0.10** (all
+  three elementwise above all three cross-attention is 1 of 20 possible orderings, one-sided
+  0.05, two-sided 0.10). So this is consistent, replicated evidence of a modest advantage, not a
+  statistically significant one in the textbook sense. More seeds would sharpen it.
+- **Counting** is the clearest difference — see the counting section above: cross-attention
+  stays near the no-image floor on all three runs.
+- **No claim of superiority for cross-attention survives.** The original hypothesis — that
+  letting the question attend over the image would help — was not supported on this data; at best
+  it matched elementwise on one lucky seed.
+
+Caveats: three runs is small. The app still serves the seed-0 pair (the deployed
+checkpoints), whose overall accuracy matches the cluster evaluation to the hundredth. The
+range-summed counting metric exists for 5 of the 6 runs in the main table (the elementwise
+seed-1 evaluation predates it, and seed 0 was re-scored on the deployed checkpoints). The
+ensemble check below scored all three elementwise runs the same way (on the in-vocabulary count
+questions only, so the figures differ by a fraction of a point from the table above): 68.0, 67.9
+and 68.4, mean 68.1 — consistent with the 68.1 mean of the three runs in the counting table
+(68.1, 68.5, 67.6; the third is run 4, below).
+
+### A fourth elementwise run (`gen_xcit_s3`, 2026-10-13)
+
+A fourth elementwise run was trained and evaluated after the comparison above was written. It
+scored 72.70% on RSVQA-LR, 83.23% on RSVQA-HR's own cities and 79.31% on Philadelphia, and 67.6%
+on counting in ranges. With it, the elementwise means over four runs are **72.56 ± 0.57**
+(RSVQA-LR), **82.86 ± 0.68** (RSVQA-HR) and **77.84 ± 1.03** (Philadelphia), against the
+unchanged three cross-attention runs (71.15, 78.66, 76.09): gaps of about +1.4, +4.2 and +1.8
+points. All four elementwise runs are above all three cross-attention runs on RSVQA-LR and
+RSVQA-HR; on Philadelphia they still overlap. The balanced three-against-three tables above
+remain the headline (they are the three runs of each design that the app serves); this run only
+confirms the direction. With four runs against three the best an exact rank test can give is about
+p = 0.03 one-sided (0.06 two-sided), so it is still not conventionally significant.
+
+### Would averaging the three elementwise runs help? (`scripts/ensemble_eval.py`, 2026-10-08)
+
+A *seed ensemble* averages the three models' answer probabilities and then picks the top answer.
+Scored on all 9,838 RSVQA-LR test questions that are in the answer vocabulary:
+
+| | overall | average over question types | counting (5 ranges) |
+|---|---|---|---|
+| seed 0 / seed 1 / seed 2 | 72.02 / 73.30 / 72.22 | 73.65 / 75.32 / 73.58 | 68.03 / 67.93 / 68.39 |
+| mean of the three single runs | 72.51 | 74.18 | 68.12 |
+| **ensemble of the three** | **73.02** | **75.15** | **69.08** |
+
+- Against a *typical* single run the ensemble is better by about 0.5 points overall and 1 point on
+  the type average and on counting. It smooths out an unlucky seed.
+- It does **not** beat the best single run (seed 1: 73.30 overall, 75.32 average), and it costs
+  three times the inference and three checkpoints. So it is not the default; it would be an
+  optional "robust mode".
+- One test set (RSVQA-LR) and three runs: a small, plausible gain, not a tested one.
+
+## Counting-aware training (code ready, not yet run on the cluster) — 2026-10-13
+
+Counting in ranges (above) was obtained **without retraining**, by decoding the model's output
+differently. The model itself was still trained only to name the exact integer. This is the
+training-side follow-up: an auxiliary loss, `models/count_loss.py`, that rewards the probability
+the model puts in the *true range* of a count question, computed the same way the app decodes it
+(restrict to numeric answers, renormalise, sum per range — see
+`backend/app/infrastructure/vqa/count_decoding.py`):
+
+    loss = cross_entropy + w × mean over count questions of  −log( mass in the true range )
+
+It is **off by default** (`--count-loss-weight 0`), so every earlier run reproduces exactly. The
+loss itself is unit-tested (`tests/test_count_loss.py`, nine tests: it is small when the mass sits
+in the true range, an answer that is off by a few but in the right range costs nothing extra,
+non-count rows are ignored, and the gradient pushes mass toward the true range), and a CPU smoke
+run of the full trainer with the loss on completed (`train_generalist.py --smoke
+--count-loss-weight 0.5`). **No result exists yet.** Whether it improves counting, and whether it
+costs accuracy on the other question types, is an open question this section does not answer.
+
+To run it, one job at a time, on the cluster (copy the vocabulary first, as for every new tag;
+`w = 0.5` is an untuned first guess — one run per design, compared against the three-run means
+above, is what would tell you whether it helps):
+
+```bash
+cd ~/geovision-gpt-ml
+cp checkpoints/gen_xcit_answer_vocab.json checkpoints/gen_xcit_cnt_answer_vocab.json
+TAG=gen_xcit_cnt FUSION=elementwise EXTRA_ARGS="--count-loss-weight 0.5" sbatch train_generalist.sbatch
+# when it finishes ("Training complete" in the log):
+TAG=gen_xcit_cnt sbatch --time=03:00:00 evaluate_generalist.sbatch
+```
+
+`evaluate_generalist.py` already writes the counting-in-ranges figure, so the result is directly
+comparable with the elementwise runs (68.1% in ranges, 61.8% by the usual argmax, 28% exact;
+no-image floor 57.9%). The success criterion to decide in advance: counting in ranges clearly
+above the 68% band of the existing runs (they span 67.6 to 68.5) **and** overall, presence and
+comparison accuracy not lower than the existing runs by more than their run-to-run spread.
 
 ## Setup
 

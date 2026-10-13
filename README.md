@@ -67,15 +67,49 @@ The first launch also needs internet briefly: the model downloads two small pret
 pieces (BERT-Tiny, XCiT-Nano) from Hugging Face before loading the trained weights on top,
 then caches them for next time.
 
+### Everything the app needs that isn't in git
+
+Following the steps above is enough to run the app. These are the pieces that live outside the
+repository (too large for git, or someone else's data), what each is for, and where it comes
+from — nothing is hidden on one particular laptop.
+
+| Asset | Size | Needed for | Where it comes from |
+|---|---|---|---|
+| Trained VQA checkpoints + answer vocabulary | ~35 MB each | Answering questions | `gh release download v1.0-trained-models …` (step above) |
+| BERT-Tiny and XCiT-Nano pretrained weights | ~30 MB | Loading the trained models | Hugging Face, fetched automatically on first launch and cached |
+| CLIPSeg segmentation weights (`CIDAS/clipseg-rd64-refined`) | ~577 MB | The **"highlight … in the image"** button for **water**, and for buildings when map data is unavailable | Hugging Face, fetched automatically the first time that button is used — or fetch it ahead of time with the command below |
+| Map data (OpenStreetMap, via the free Overpass servers) | small, cached on disk | The highlight button for **roads, buildings, forest, grass, farmland and cemeteries** (needs the image's location) | Streamed from the internet when first needed, then kept in `backend/storage/map_cache/`. The free servers are unreliable — run `python scripts/warm_map_cache.py` once, online, to store the places you'll demo (see the runbook). Map data © OpenStreetMap contributors (ODbL) |
+| Live basemap tiles (Esri) | — | The Map page | Streamed from the internet while the page is open; nothing to install |
+| Demo images | ~100 scenes | Rehearsing the demo | The RSVQA-LR test split. Download `Images_LR.zip` from [Zenodo 6344334](https://zenodo.org/records/6344334) and use the images listed in `LR_split_test_images.json`; the runbook names the ones that work well |
+| RSVQA-LR and RSVQA-HR datasets | ~GBs | **Retraining only**, not running the app | See [`ml/README.md`](ml/README.md) |
+
+To fetch the segmentation weights ahead of time (so the first highlight click isn't slow, or
+before going offline), run this once with the backend's Python. It skips the duplicate `.bin`
+copy of the weights that the Hugging Face repo also ships:
+
+```powershell
+backend\.venv\Scripts\python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('CIDAS/clipseg-rd64-refined', allow_patterns=['*.json','*.txt','model.safetensors'])"
+```
+
+Highlighting **vegetation** uses a plain colour index and needs no download at all. If the
+CLIPSeg weights can't be fetched (offline, first use), water highlights return a clear
+"segmentation model isn't available" message and everything else keeps working. To turn
+highlighting off entirely, set `GVG_SEGMENTATION_ENABLED=false`; to stop it using the internet
+for map data, set `GVG_MAP_DATA_ENABLED=false`.
+
 ## Status
 
 | Track | Scope | Status |
 |---|---|---|
 | **Model** | Dataset (RSVQA-LR), architecture, training/eval scripts | **Complete** |
-| **Model** | Widened training (RSVQA-LR + RSVQA-HR, augmentation), elementwise fusion — what the app serves | **Complete** — 72.0% overall on RSVQA-LR (no regression vs. the single-dataset baseline), 77.2% on an unseen city (Philadelphia), and the dimmed-image robustness weakness below is fixed (62%→88%). Details in [`ml/README.md`](ml/README.md) |
-| **Model** | Widened training, cross-attention fusion — what the app serves | **Complete** — 72.0% overall on RSVQA-LR, 74.4% on the unseen city; still effectively tied with the elementwise model, confirming richer fusion doesn't measurably help here either |
-| **Model** | Significance test on the elementwise-vs-cross-attention tie | **Complete** — McNemar's test (p=0.84) and a 10,000-resample bootstrap (95% CI contains 0) both confirm the tie is real, not just an unmeasured small gap. Details in [`ml/README.md`](ml/README.md) |
+| **Model** | Widened training (RSVQA-LR + RSVQA-HR, augmentation), elementwise fusion — what the app serves | **Complete** — mean of 3 training runs: 72.5% ± 0.7 overall on RSVQA-LR (no regression vs. the single-dataset baseline), 82.7% ± 0.8 on RSVQA-HR's own cities, 77.4% ± 0.4 on an unseen city (Philadelphia); the dimmed-image robustness weakness below is fixed (62%→88%, seed 0). Details in [`ml/README.md`](ml/README.md) |
+| **Model** | Widened training, cross-attention fusion — what the app serves | **Complete** — mean of 3 training runs: 71.2% ± 0.8 overall on RSVQA-LR, 78.7% ± 1.8 on RSVQA-HR, 76.1% ± 1.7 on the unseen city. **Slightly worse and less steady than elementwise** (every elementwise run beat every cross-attention run on RSVQA-LR and RSVQA-HR; by 0.06 points at the closest on RSVQA-LR). The richer fusion did not help. With one run each (seed 0) the two looked tied — that was luck of the draw |
+| **Model** | Significance test on the elementwise-vs-cross-attention tie | **Complete, but superseded** — McNemar's test (p=0.84) and a 10,000-resample bootstrap (95% CI contains 0) show the two **seed-0** models are not distinguishable on those questions. It only compares one trained model per fusion, so it could not see run-to-run variation; the three-run comparison above is the stronger evidence. Details in [`ml/README.md`](ml/README.md) |
 | **Model** | Attention heatmap — where cross-attention looked, shown in the app | **Complete** — toggle on the cross-attention answer card; verified live to concentrate on the relevant scene content, not scattered randomly |
+| **Model** | Counting, answered as ranges (0 / 1–10 / 11–100 / 101–1,000 / >1,000) like the RSVQA paper scores it | **Complete** — summing probability per range instead of picking one exact number lifts counts placed in the right range to **68.1%** (elementwise, 3 runs) and **58.6%** (cross-attention, 3 runs), against **57.9%** for a guess that never looks at the image — so the image helps elementwise counting by ~10 points and cross-attention's by almost nothing. Exact-match stays ~28%, which is why it was misleading. No retraining. A counting-aware training loss (`ml/models/count_loss.py`, off by default) is written and tested but **not yet run on the cluster**; no result is claimed. Caveats in [`ml/README.md`](ml/README.md) |
+| Web app | "Highlight … in the image": whatever the question names — vegetation, forest, grass, farmland, water, buildings, roads, cemeteries; **both things** for a comparison | **Complete, with stated limits** — never the trained VQA model, which cannot locate anything. Vegetation and water come from the image (colour index; CLIPSeg). Roads, buildings, forest, grass, farmland and cemeteries are **OpenStreetMap map data** drawn at the scene's coordinates, because at 10 m per pixel the image alone can't show them — labelled as map data on screen. Needs a georeferenced image and (once) internet; no accuracy measured, since there are no labelled masks |
+| Web app | Question guard — what can be asked | **Complete** — the models only know RSVQA's four question kinds (presence, count, comparison, rural/urban). Loosely-worded questions are read as the nearest template and the answer card says so ("Is there a river?" → "Is there a water area?"); questions of another kind ("describe this", colours) are turned away with a list of what can be asked instead of a confident guess. Listed exactly in [`docs/03-demo-runbook.md`](docs/03-demo-runbook.md) |
+| Web app | Live map: search any place, **Analyse this place** | **Complete** — fetches a 256 × 256 px, ~10 m Sentinel-2 scene (the scale the models were trained on) from the map, stores it like an upload, and opens it in the Q&A workspace |
 | **Model** | Original single-dataset baseline (elementwise fusion) — superseded, kept for reference | 72.74% overall / 75.16% average on RSVQA-LR test; dimming an image dropped its rural/urban accuracy from 92%→62%, which is what motivated the widened training above |
 | **Model** | Original single-dataset cross-attention (the project's first experiment) — superseded, kept for reference | 72.33% overall / 72.29% average: effectively tied with the original baseline; details and caveats in [`ml/README.md`](ml/README.md) |
 | Web app — Module 1 | Authentication, RBAC, audit | **Complete** |
@@ -196,6 +230,25 @@ Base path `/api/v1`.
   served as JPEG.
 - Storage is swappable by configuration: filesystem locally, MinIO/S3 behind
   `GVG_STORAGE_BACKEND=minio`, same `ObjectStorage` port either way.
+- `POST /images/capture` fetches a Sentinel-2 scene for a latitude/longitude (the Map page's
+  **Analyse this place**) and stores it as the caller's own image, through the same pipeline
+  as an upload. Imagery is Sentinel-2 cloudless by EOX IT Services GmbH, free for
+  non-commercial use with attribution; needs internet. `GVG_IMAGERY_ENABLED=false` turns it
+  off.
+
+### Modules 3/4 — questions, counting and highlighting
+
+- `POST /images/{id}/ask` answers with both fusion variants. **Counting questions** ("How
+  many …", "What is the number of …") are answered as one of five ranges, with a note saying
+  why; every other question is answered as before.
+- `POST /images/{id}/attention` returns cross-attention's attention grid (interpretability).
+- `POST /images/{id}/highlight` returns one overlay locating the thing(s) the question names —
+  one thing, or two for a comparison ("more roads than buildings?"), each in its own colour.
+  A question naming nothing supported is a 422. Each layer says **which method** found it (a
+  colour index, zero-shot CLIPSeg, or OpenStreetMap map data) and **how far to trust it**; none
+  of them is the trained VQA model. Size and shape words in the question ("large",
+  "circular") are not used, and the response says so. `GVG_SEGMENTATION_ENABLED=false` and
+  `GVG_MAP_DATA_ENABLED=false` turn it off.
 
 ### Security properties
 

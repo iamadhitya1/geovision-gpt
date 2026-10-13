@@ -7,6 +7,7 @@ same wiring without inheriting the HTTP server.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -27,10 +28,13 @@ from app.infrastructure.bootstrap import ensure_first_admin
 from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
 from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
+from app.infrastructure.imaging.osm_provider import OverpassMapData
+from app.infrastructure.imaging.sentinel_provider import EoxSentinel2Provider
 from app.infrastructure.security.password import Argon2PasswordHasher
 from app.infrastructure.security.tokens import JwtTokenService
 from app.infrastructure.storage.factory import build_storage
 from app.infrastructure.vqa.model_runner import TorchVqaModelRunner
+from app.infrastructure.vqa.segmenter import ZeroShotSegmenter
 
 logger = get_logger(__name__)
 
@@ -156,6 +160,31 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         vocab_path=Path(settings.vqa_vocab_path),
         device=settings.vqa_device,
     )
+    app.state.imagery = (
+        EoxSentinel2Provider(
+            tile_url_template=settings.imagery_tile_url,
+            user_agent=settings.imagery_user_agent,
+        )
+        if settings.imagery_enabled
+        else None
+    )
+    app.state.map_data = (
+        OverpassMapData(
+            user_agent=settings.imagery_user_agent,
+            cache_dir=Path(settings.map_data_cache_dir),
+        )
+        if settings.map_data_enabled
+        else None
+    )
+    app.state.segmenter = (
+        ZeroShotSegmenter(
+            clipseg_model_id=settings.segmentation_clipseg_model_id,
+            device=settings.vqa_device,
+            map_data=app.state.map_data,
+        )
+        if settings.segmentation_enabled
+        else None
+    )
 
 
 @asynccontextmanager
@@ -170,6 +199,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await ensure_first_admin(app.state.session_factory, settings, app.state.password_hasher)
 
+    segmenter = app.state.segmenter
+    if segmenter is not None and settings.segmentation_warm_up:
+        # In the background, so startup isn't held up by a ~577 MB load; kept on app.state so
+        # the task isn't garbage-collected mid-load.
+        app.state.segmenter_warm_up = asyncio.create_task(asyncio.to_thread(segmenter.warm_up))
+
     logger.info(
         "application_started",
         environment=settings.environment.value,
@@ -180,6 +215,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    if app.state.imagery is not None:
+        await app.state.imagery.aclose()
+    if app.state.map_data is not None:
+        await app.state.map_data.aclose()
     await app.state.engine.dispose()
     close = getattr(app.state.cache, "close", None)
     if close is not None:

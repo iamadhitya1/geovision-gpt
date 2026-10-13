@@ -18,8 +18,19 @@ from app.application.dto import RequestContext
 from app.core.logging import get_logger
 from app.domain.entities import SatelliteImage, User
 from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus
-from app.domain.errors import AuthorizationError, FileTooLargeError, NotFoundError
-from app.domain.interfaces import ImageAnalyzer, ImageRepository, ObjectStorage, UnitOfWork
+from app.domain.errors import (
+    AuthorizationError,
+    FileTooLargeError,
+    ImageryUnavailableError,
+    NotFoundError,
+)
+from app.domain.interfaces import (
+    ImageAnalyzer,
+    ImageRepository,
+    ImageryProvider,
+    ObjectStorage,
+    UnitOfWork,
+)
 
 logger = get_logger(__name__)
 
@@ -37,6 +48,7 @@ class ImageService:
         uow: UnitOfWork,
         max_upload_size_bytes: int,
         thumbnail_max_size_px: int,
+        imagery: ImageryProvider | None = None,
     ) -> None:
         self._images = images
         self._storage = storage
@@ -45,6 +57,7 @@ class ImageService:
         self._uow = uow
         self._max_upload_size_bytes = max_upload_size_bytes
         self._thumbnail_max_size_px = thumbnail_max_size_px
+        self._imagery = imagery
 
     @property
     def max_upload_size_bytes(self) -> int:
@@ -117,6 +130,31 @@ class ImageService:
             status=image.status.value,
         )
         return image
+
+    async def capture_scene(
+        self,
+        *,
+        owner: User,
+        latitude: float,
+        longitude: float,
+        context: RequestContext | None = None,
+    ) -> SatelliteImage:
+        """Fetch a satellite scene for a point on the map and store it as the owner's image.
+
+        The scene goes through exactly the same pipeline as an uploaded file — validation,
+        metadata, thumbnail, footprint on the map — so everything that works on an upload
+        (questions, highlighting, the map) works on a captured place too.
+        """
+        if self._imagery is None:
+            raise ImageryUnavailableError(
+                "Fetching imagery from the map isn't enabled on this server."
+            )
+        data = await self._imagery.fetch_scene(latitude, longitude)
+        filename = (
+            f"sentinel2_{abs(latitude):.4f}{'N' if latitude >= 0 else 'S'}"
+            f"_{abs(longitude):.4f}{'E' if longitude >= 0 else 'W'}.tif"
+        )
+        return await self.upload(owner=owner, filename=filename, data=data, context=context)
 
     async def _process(
         self, image: SatelliteImage, data: bytes, context: RequestContext | None

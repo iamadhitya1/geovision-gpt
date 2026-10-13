@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageFormat, ImageStatus, Role
@@ -198,6 +198,9 @@ class VqaAnswer:
     answer: str
     confidence: float
     alternatives: tuple[AnswerAlternative, ...]  # ranked, most confident first
+    # A plain-English caveat shown beside the answer when it needs one — currently only
+    # counting questions, which are answered as a range rather than an exact number.
+    note: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +220,46 @@ class AttentionHeatmap:
     confidence: float
     grid_size: int
     weights: tuple[float, ...]  # length grid_size * grid_size
+
+
+@dataclass(frozen=True, slots=True)
+class MapFeature:
+    """One piece of map geometry in lon/lat: a line (a road) or a polygon (a building)."""
+
+    kind: Literal["line", "polygon"]
+    points: tuple[tuple[float, float], ...]  # (longitude, latitude)
+
+
+@dataclass(frozen=True, slots=True)
+class HighlightLayer:
+    """One thing a question named, and where it was found.
+
+    ``method`` names the technique honestly — a colour index, a zero-shot segmenter, or
+    OpenStreetMap map data — because none of them is the trained VQA model, which cannot locate
+    anything. ``caveat`` says how far to trust it, and is set wherever a method is weak.
+    """
+
+    concept: str
+    label: str  # what to call it on screen, e.g. "roads"
+    color: str  # "#rrggbb", the colour it is outlined in
+    coverage: float  # fraction of the image it covers (0.0-1.0)
+    method: str
+    caveat: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ConceptHighlight:
+    """What to lay over an image to point at the thing(s) a question is about.
+
+    ``overlay_png`` is a transparent PNG the same shape as the analysed image: everything
+    *outside* every layer is dimmed, and each layer is tinted and outlined in its own colour, so
+    the matching areas stand out in the foreground. ``caveat`` is a note about the whole
+    highlight (e.g. that size and shape words in the question were not used).
+    """
+
+    layers: tuple[HighlightLayer, ...]
+    overlay_png: bytes
+    caveat: str | None = None
 
 
 @dataclass(slots=True)

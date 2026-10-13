@@ -326,6 +326,7 @@ def _answer_to_json(answer: VqaAnswer) -> dict[str, Any]:
         "alternatives": [
             {"answer": alt.answer, "confidence": alt.confidence} for alt in answer.alternatives
         ],
+        "note": answer.note,
     }
 
 
@@ -338,6 +339,7 @@ def _answer_from_json(data: dict[str, Any]) -> VqaAnswer:
             AnswerAlternative(answer=alt["answer"], confidence=alt["confidence"])
             for alt in data["alternatives"]
         ),
+        note=data.get("note"),  # absent on answers stored before counting ranges existed
     )
 
 

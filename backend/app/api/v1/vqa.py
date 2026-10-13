@@ -12,6 +12,7 @@ from app.application.dto import (
     AskQuestionRequest,
     AttentionHeatmapRead,
     ExplainRequest,
+    HighlightRead,
     Page,
     RequestContext,
     VqaQueryRead,
@@ -105,6 +106,35 @@ async def explain_attention(
         image_id=image_id, question=request.question, requesting_user=researcher
     )
     return AttentionHeatmapRead.from_domain(heatmap)
+
+
+@router.post(
+    "/images/{image_id}/highlight",
+    response_model=HighlightRead,
+    summary="Highlight where the thing a question is about appears in the image",
+    responses={
+        404: {"description": "Image not found, or not owned by the caller"},
+        422: {
+            "description": "The image isn't ready, or the question names nothing that can be "
+            "highlighted (vegetation, water, buildings and roads are supported)"
+        },
+        503: {"description": "Highlighting, or the segmentation model, isn't available"},
+    },
+)
+async def highlight_concept(
+    image_id: UUID,
+    request: ExplainRequest,
+    researcher: ResearcherUser,
+    service: VqaServiceDep,
+) -> HighlightRead:
+    """Returns a transparent overlay: everything outside the concept dimmed, the concept
+    outlined. This comes from a separate segmentation step (a colour index for vegetation,
+    zero-shot CLIPSeg for the rest) — not from the trained VQA model, which cannot locate
+    anything. The response's `method` and `caveat` say how far to trust it."""
+    highlight = await service.highlight(
+        image_id=image_id, question=request.question, requesting_user=researcher
+    )
+    return HighlightRead.from_domain(highlight)
 
 
 @router.get(

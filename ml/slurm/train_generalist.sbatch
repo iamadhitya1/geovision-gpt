@@ -7,6 +7,7 @@
 #   TAG=timing_probe MAX_MINUTES=10 sbatch train_generalist.sbatch     # 10-minute speed probe
 #   TAG=gen_xcit sbatch train_generalist.sbatch                        # the real run
 #   TAG=gen_xcit_xattn FUSION=cross_attention sbatch train_generalist.sbatch
+#   TAG=gen_xcit_cnt EXTRA_ARGS="--count-loss-weight 0.5" sbatch train_generalist.sbatch   # counting-aware (see ml/README.md)
 #
 # RESUMING: the trainer stops itself cleanly after MAX_MINUTES (default 215, i.e. before the 4 hour
 # limit) and saves its full state. If the log ends with "STOPPING ... Run again to resume", submit

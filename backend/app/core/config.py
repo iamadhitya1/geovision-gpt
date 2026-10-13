@@ -114,6 +114,36 @@ class Settings(BaseSettings):
     vqa_device: Literal["auto", "cpu", "cuda"] = "auto"
     vqa_top_k_alternatives: int = Field(default=3, ge=1, le=20)
 
+    # --- Live map imagery -------------------------------------------------------
+    # "Analyse this place" on the Map page fetches a ~10 m Sentinel-2 scene for the point
+    # (the data the models were trained on). Sentinel-2 cloudless by EOX IT Services GmbH,
+    # free for non-commercial use with attribution — see app/infrastructure/imaging/
+    # sentinel_provider.py. Needs internet; set false to turn the feature off.
+    imagery_enabled: bool = True
+    imagery_tile_url: str = (
+        "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"
+    )
+    imagery_user_agent: str = "GeoVisionGPT/0.1 (student research project)"
+
+    # --- Answer highlighting ----------------------------------------------------
+    # "Show where" on an answer. Vegetation uses a colour index and needs no download; the
+    # other concepts use this pretrained text-prompted segmenter (~577 MB, fetched from
+    # Hugging Face on first use and cached — see the root README's new-device setup).
+    segmentation_enabled: bool = True
+    # Roads, buildings, forest, grass, farmland and cemeteries can't be found from 10 m imagery,
+    # so for a georeferenced image they are drawn from OpenStreetMap (map data, labelled as such
+    # on screen). Needs internet; when off or unreachable, buildings and vegetation fall back to
+    # the image and roads/cemeteries say they can't be shown.
+    map_data_enabled: bool = True
+    # Map data already fetched for a place is kept here, so a rehearsed place works
+    # instantly (and offline) at the demo. Not in git.
+    map_data_cache_dir: str = "./storage/map_cache"
+    segmentation_clipseg_model_id: str = "CIDAS/clipseg-rd64-refined"
+    # Load the segmentation weights in the background at startup instead of on the first
+    # highlight click (which otherwise pauses for ~7 s). Off by default so tests and machines
+    # without the weights don't pay ~577 MB at startup; `dev.ps1 demo` turns it on.
+    segmentation_warm_up: bool = False
+
     # --- Derived helpers -----------------------------------------------------
     @property
     def is_production(self) -> bool:

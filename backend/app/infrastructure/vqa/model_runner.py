@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
+from dataset.count_ranges import RANGE_LABELS, is_count_question
 from dataset.rsvqa_lr_dataset import AnswerVocabulary
 from models.vqa_model import (
     CrossAttentionFusion,
@@ -30,11 +31,17 @@ from app.core.logging import get_logger
 from app.domain.entities import AnswerAlternative, AttentionHeatmap, VqaAnswer
 from app.domain.enums import FusionType
 from app.domain.errors import CorruptImageError, ModelUnavailableError
+from app.infrastructure.vqa.count_decoding import CountDecoder
 
 # XCiT-Nano prepends one summary ("class") token at index 0 before its 196 real patch
 # tokens (confirmed against timm's xcit.py source, not assumed) — the heatmap drops that
 # one and reshapes the remaining 196 into the image's 14x14 patch grid.
 _ATTENTION_GRID_SIZE = 14
+
+_COUNT_NOTE = (
+    "Counts are given as a range, the way the original RSVQA benchmark scores them — an exact "
+    "number can't be read reliably from imagery at this resolution."
+)
 
 logger = get_logger(__name__)
 
@@ -74,8 +81,10 @@ class TorchVqaModelRunner:
         self._model_encoders: dict[FusionType, ImageEncoderName] = {}
 
         self._vocab: AnswerVocabulary | None = None
+        self._count_decoder: CountDecoder | None = None
         if vocab_path.exists():
             self._vocab = AnswerVocabulary.from_json(vocab_path)
+            self._count_decoder = CountDecoder(self._vocab)
         else:
             logger.warning("vqa_vocab_missing", path=str(vocab_path))
 
@@ -151,6 +160,9 @@ class TorchVqaModelRunner:
             logits = model(pixel_values, input_ids, attention_mask)
             probabilities = torch.softmax(logits, dim=-1)[0]
 
+        if self._count_decoder is not None and is_count_question(question):
+            return self._count_answer(fusion, logits[0], top_k)
+
         k = min(top_k, probabilities.shape[0])
         top_probs, top_indices = torch.topk(probabilities, k=k)
 
@@ -163,6 +175,25 @@ class TorchVqaModelRunner:
             answer=alternatives[0].answer,
             confidence=alternatives[0].confidence,
             alternatives=alternatives,
+        )
+
+    def _count_answer(self, fusion: FusionType, logits: torch.Tensor, top_k: int) -> VqaAnswer:
+        """A counting question, answered as the most probable *range* — see
+        :mod:`app.infrastructure.vqa.count_decoding` for why this beats the exact-number
+        argmax. ``confidence`` is that range's total probability."""
+        assert self._count_decoder is not None  # checked by the caller
+        range_probs = self._count_decoder.range_probabilities(logits)
+        ranked = sorted(enumerate(range_probs), key=lambda item: item[1], reverse=True)
+        alternatives = tuple(
+            AnswerAlternative(answer=RANGE_LABELS[index], confidence=prob)
+            for index, prob in ranked[: max(top_k, 1)]
+        )
+        return VqaAnswer(
+            fusion=fusion,
+            answer=alternatives[0].answer,
+            confidence=alternatives[0].confidence,
+            alternatives=alternatives,
+            note=_COUNT_NOTE,
         )
 
     async def explain(self, image_data: bytes, question: str) -> AttentionHeatmap:

@@ -1,5 +1,6 @@
 import type {
   AttentionHeatmap,
+  ConceptHighlight,
   AuthResponse,
   FusionType,
   Page,
@@ -170,6 +171,16 @@ export const api = {
   /** Cross-attention only — see AttentionHeatmap. 503 if that fusion isn't loaded. */
   explainAttention: (imageId: string, question: string) =>
     request<AttentionHeatmap>(`/images/${imageId}/attention`, json("POST", { question })),
+
+  /** Fetch a ~10 m Sentinel-2 scene for a point on the map and store it as the caller's own
+   * image (a normal upload from there on). 502 if the imagery service can't be reached. */
+  captureScene: (latitude: number, longitude: number) =>
+    request<SatelliteImage>("/images/capture", json("POST", { latitude, longitude })),
+
+  /** Where the thing the question is about appears in the image. 422 if the question names
+   * nothing highlightable, 503 if highlighting or its model isn't available. */
+  highlightConcept: (imageId: string, question: string) =>
+    request<ConceptHighlight>(`/images/${imageId}/highlight`, json("POST", { question })),
 
   /** The thumbnail endpoint needs the bearer header, which an <img src> can't send. */
   thumbnailBlob: async (id: string): Promise<Blob> => {

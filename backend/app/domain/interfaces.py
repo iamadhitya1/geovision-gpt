@@ -10,13 +10,17 @@ root) is the only place that names a concrete class.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from app.domain.concepts import HighlightConcept
 from app.domain.entities import (
     AttentionHeatmap,
     AuditEvent,
+    ConceptHighlight,
     ImageMetadata,
+    MapFeature,
     SatelliteImage,
     TokenClaims,
     User,
@@ -188,6 +192,64 @@ class VqaModelPort(Protocol):
         ...
 
     def available_fusions(self) -> frozenset[FusionType]: ...
+
+
+@runtime_checkable
+class ImageryProvider(Protocol):
+    """Fetches a satellite scene for a point on Earth, as a GeoTIFF.
+
+    The scene is shaped like the data the VQA models were trained on (RSVQA-LR: 256 x 256 px,
+    about 10 m per pixel), so a question about it is a fair one for them — unlike a screenshot
+    of a very high-resolution map, which they were never shown.
+    """
+
+    async def fetch_scene(self, latitude: float, longitude: float) -> bytes:
+        """GeoTIFF bytes (EPSG:3857, 3 bands, 8-bit) centred on the point. Raises
+        :class:`~app.domain.errors.ImageryUnavailableError` if the imagery service can't be
+        reached or has nothing there."""
+        ...
+
+
+@runtime_checkable
+class MapDataPort(Protocol):
+    """Looks up map features (roads, buildings, forests…) for a stretch of the Earth.
+
+    Real map data, not something detected in the image — so a highlight drawn from it is
+    labelled as such. It can be newer or older than the imagery, and anything nobody mapped is
+    missing.
+    """
+
+    async def fetch(
+        self, concept: HighlightConcept, bounds_wgs84: tuple[float, float, float, float]
+    ) -> list[MapFeature]:
+        """``bounds_wgs84`` is (west, south, east, north). Raises
+        :class:`~app.domain.errors.ImageryUnavailableError` if the service can't be reached."""
+        ...
+
+
+@runtime_checkable
+class SegmentationPort(Protocol):
+    """Finds where the things a question names appear in an image.
+
+    Separate from :class:`VqaModelPort` on purpose: the trained VQA model answers with a label
+    and cannot locate anything, so "highlight the roads" is a different component with its own
+    failure modes, and the two are reported as such.
+    """
+
+    async def highlight(
+        self,
+        image_data: bytes,
+        concepts: Sequence[HighlightConcept],
+        *,
+        bounds_wgs84: tuple[float, float, float, float] | None = None,
+    ) -> ConceptHighlight:
+        """``bounds_wgs84`` (west, south, east, north) is where the image is on Earth, if it is
+        georeferenced; without it only image-based methods are possible. Raises
+        :class:`~app.domain.errors.ModelUnavailableError` if a segmentation model is needed but
+        missing, :class:`~app.domain.errors.ImageryUnavailableError` if map data is needed but
+        unreachable and there is no image-based fallback, and
+        :class:`~app.domain.errors.CorruptImageError` if ``image_data`` can't be decoded."""
+        ...
 
 
 @runtime_checkable

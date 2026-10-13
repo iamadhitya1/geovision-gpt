@@ -7,16 +7,20 @@ that class of leak impossible rather than merely discouraged.
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from typing import Annotated, Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.domain.concepts import question_kind, resolve_targets
 from app.domain.entities import (
     AnswerAlternative,
     AttentionHeatmap,
     AuditEvent,
+    ConceptHighlight,
+    HighlightLayer,
     ImageMetadata,
     SatelliteImage,
     TokenPair,
@@ -124,6 +128,18 @@ class AdminUpdateUserRequest(BaseModel):
     role: Role | None = None
     is_active: bool | None = None
     is_verified: bool | None = None
+
+
+class CaptureSceneRequest(BaseModel):
+    """A point on the map to fetch a satellite scene for. Latitude is limited to +-80
+    degrees: beyond that the Web Mercator map and the Sentinel-2 mosaic both thin out."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"latitude": 52.9554, "longitude": 5.7743}}
+    )
+
+    latitude: Annotated[float, Field(ge=-80.0, le=80.0)]
+    longitude: Annotated[float, Field(ge=-180.0, le=180.0)]
 
 
 class AskQuestionRequest(BaseModel):
@@ -356,6 +372,7 @@ class VqaAnswerRead(BaseModel):
     answer: str
     confidence: float
     alternatives: list[AnswerAlternativeRead]
+    note: str | None = None
 
     @classmethod
     def from_domain(cls, answer: VqaAnswer) -> VqaAnswerRead:
@@ -364,6 +381,7 @@ class VqaAnswerRead(BaseModel):
             answer=answer.answer,
             confidence=answer.confidence,
             alternatives=[AnswerAlternativeRead.from_domain(a) for a in answer.alternatives],
+            note=answer.note,
         )
 
 
@@ -399,6 +417,70 @@ class AttentionHeatmapRead(BaseModel):
             confidence=heatmap.confidence,
             grid_size=heatmap.grid_size,
             weights=list(heatmap.weights),
+        )
+
+
+class HighlightLayerRead(BaseModel):
+    """One thing the question named, and how it was found."""
+
+    concept: str
+    label: str  # what to call it on screen
+    color: str  # "#rrggbb" — the colour it is outlined in on the overlay
+    coverage: float  # fraction of the image it covers
+    method: str
+    caveat: str | None = None
+
+    @classmethod
+    def from_domain(cls, layer: HighlightLayer) -> HighlightLayerRead:
+        return cls(
+            concept=layer.concept,
+            label=layer.label,
+            color=layer.color,
+            coverage=layer.coverage,
+            method=layer.method,
+            caveat=layer.caveat,
+        )
+
+
+class HighlightRead(BaseModel):
+    """Where the thing(s) a question names appear in the image, as one transparent overlay
+    PNG the same shape as the image: everything outside them dimmed, each outlined in its own
+    colour (see `layers` for the legend).
+
+    Produced by a separate step, not by the trained VQA model (which cannot locate anything)
+    — each layer's `method` says which technique (a colour index, a zero-shot segmenter, or
+    OpenStreetMap map data) and `caveat` says how far to trust it.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "layers": [
+                    {
+                        "concept": "roads",
+                        "label": "roads",
+                        "color": "#ff5a5a",
+                        "coverage": 0.04,
+                        "method": "OpenStreetMap map data — not detected from the image",
+                        "caveat": "Drawn from map data at this scene's coordinates…",
+                    }
+                ],
+                "overlay_png_base64": "iVBORw0KGgo... (PNG, base64)",
+                "caveat": None,
+            }
+        }
+    )
+
+    layers: list[HighlightLayerRead]
+    overlay_png_base64: str
+    caveat: str | None = None
+
+    @classmethod
+    def from_domain(cls, highlight: ConceptHighlight) -> HighlightRead:
+        return cls(
+            layers=[HighlightLayerRead.from_domain(layer) for layer in highlight.layers],
+            overlay_png_base64=base64.b64encode(highlight.overlay_png).decode("ascii"),
+            caveat=highlight.caveat,
         )
 
 
@@ -439,6 +521,11 @@ class VqaQueryRead(BaseModel):
     question: str
     answers: list[VqaAnswerRead]
     created_at: datetime
+    # What in the question can be highlighted on the image (one thing, or two for a
+    # comparison), and what kind of question it is — a "no" to a presence question means there is
+    # nothing to point at, a "no" to a comparison does not. Worked out from the text, not stored.
+    highlight_targets: list[str] = Field(default_factory=list)
+    highlight_kind: str = "presence"
 
     @classmethod
     def from_domain(cls, query: VqaQuery) -> VqaQueryRead:
@@ -448,6 +535,8 @@ class VqaQueryRead(BaseModel):
             question=query.question,
             answers=[VqaAnswerRead.from_domain(a) for a in query.answers],
             created_at=query.created_at,
+            highlight_targets=[c.value for c in resolve_targets(query.question)],
+            highlight_kind=question_kind(query.question),
         )
 
 

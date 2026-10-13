@@ -114,11 +114,32 @@ class ImageNotReadyError(ValidationError):
     )
 
 
+class NothingToHighlightError(ValidationError):
+    code = "nothing_to_highlight"
+    message = (
+        "This question doesn't name one thing that can be highlighted. Highlighting works "
+        "for vegetation, water, buildings and roads."
+    )
+
+
+class UnsupportedQuestionError(ValidationError):
+    code = "unsupported_question"
+    message = "That isn't a question this model can answer."
+
+
 class ModelUnavailableError(DomainError):
     code = "model_unavailable"
     message = (
         "The requested model variant isn't loaded on this server. This is expected if its "
         "trained checkpoint hasn't been deployed yet."
+    )
+
+
+class ImageryUnavailableError(DomainError):
+    code = "imagery_unavailable"
+    message = (
+        "Couldn't fetch satellite imagery for that location right now. The imagery service "
+        "may be unreachable, or the place may be outside its coverage."
     )
 
 

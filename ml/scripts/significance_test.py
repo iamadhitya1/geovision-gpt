@@ -40,7 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dataset.rsvqa_lr_dataset import AnswerVocabulary
 from dataset.vqa_examples_dataset import VqaExamplesDataset, in_vocabulary
-from models.vqa_model import build_image_transform, build_tokenizer, LitRSVQAModel
+from models.vqa_model import LitRSVQAModel, build_image_transform, build_tokenizer
 from scripts.train import make_collate_fn, resolve_device
 from scripts.train_generalist import load_examples
 
@@ -152,8 +152,8 @@ def main() -> None:
 
     # McNemar's exact test: among questions where the two models disagree, is the split
     # between "A right, B wrong" and "A wrong, B right" close to 50/50?
-    a_right_b_wrong = sum(1 for a, b in zip(a_correct, b_correct) if a and not b)
-    a_wrong_b_right = sum(1 for a, b in zip(a_correct, b_correct) if not a and b)
+    a_right_b_wrong = sum(1 for a, b in zip(a_correct, b_correct, strict=True) if a and not b)
+    a_wrong_b_right = sum(1 for a, b in zip(a_correct, b_correct, strict=True) if not a and b)
     discordant = a_right_b_wrong + a_wrong_b_right
     mcnemar_p = (
         binomtest(a_right_b_wrong, discordant, p=0.5, alternative="two-sided").pvalue
@@ -197,8 +197,8 @@ def main() -> None:
         idx = [i for i, t in enumerate(q_types) if t == qtype]
         a_t = [a_correct[i] for i in idx]
         b_t = [b_correct[i] for i in idx]
-        rbw = sum(1 for a, b in zip(a_t, b_t) if a and not b)
-        wbr = sum(1 for a, b in zip(a_t, b_t) if not a and b)
+        rbw = sum(1 for a, b in zip(a_t, b_t, strict=True) if a and not b)
+        wbr = sum(1 for a, b in zip(a_t, b_t, strict=True) if not a and b)
         disc = rbw + wbr
         p = binomtest(rbw, disc, p=0.5, alternative="two-sided").pvalue if disc > 0 else 1.0
         by_type[qtype] = {
@@ -212,7 +212,10 @@ def main() -> None:
     print("\n=== Significance test: elementwise vs cross-attention (widened models) ===")
     print(json.dumps(summary, indent=2))
 
-    out_path = OUT_DIR / ("significance_test_widened_smoke.json" if args.smoke else "significance_test_widened.json")
+    out_name = (
+        "significance_test_widened_smoke.json" if args.smoke else "significance_test_widened.json"
+    )
+    out_path = OUT_DIR / out_name
     out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"\nWritten: {out_path}")
 

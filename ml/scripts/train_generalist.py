@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dataset.augment import TrainAugmentation
 from dataset.rsvqa_lr_dataset import AnswerVocabulary, VqaExample, load_split_examples
 from dataset.vqa_examples_dataset import VqaExamplesDataset, in_vocabulary
+from models.count_loss import build_range_table, range_mass_loss
 from models.vqa_model import (
     ImageEncoderName,
     LitRSVQAModel,
@@ -113,6 +114,12 @@ def main() -> None:
     parser.add_argument("--hr-val-size", type=int, default=4000)
     parser.add_argument("--vocab-size", type=int, default=1000)
     parser.add_argument("--no-augment", action="store_true")
+    parser.add_argument(
+        "--count-loss-weight",
+        type=float,
+        default=0.0,
+        help="weight of the counting-aware loss (models/count_loss.py); 0 = off, the default",
+    )
     parser.add_argument("--amp", action="store_true", help="bfloat16 mixed precision (CUDA only)")
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--max-minutes", type=float, default=215.0, help="stop cleanly after this")
@@ -174,6 +181,9 @@ def main() -> None:
     model = LitRSVQAModel(config, fusion=args.fusion).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
+    range_table = build_range_table(len(vocab), vocab.decode)
+    if args.count_loss_weight > 0:
+        logger.info("Counting-aware loss ON, weight %.3f", args.count_loss_weight)
     logger.info(
         "Model: %s + BERT-Tiny + %s fusion, %s parameters, amp=%s, augment=%s",
         encoder,
@@ -252,7 +262,13 @@ def main() -> None:
                     batch["input_ids"].to(device),
                     batch["attention_mask"].to(device),
                 )
-                loss = criterion(logits.float(), batch["labels"].to(device))
+                labels = batch["labels"].to(device)
+                loss = criterion(logits.float(), labels)
+                if args.count_loss_weight > 0:
+                    is_count = torch.tensor([t == "count" for t in batch["question_types"]])
+                    loss = loss + args.count_loss_weight * range_mass_loss(
+                        logits.float(), labels, is_count, range_table
+                    )
             loss.backward()
             optimizer.step()
 

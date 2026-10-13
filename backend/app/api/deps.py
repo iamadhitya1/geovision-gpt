@@ -41,9 +41,11 @@ from app.domain.interfaces import (
     Cache,
     ImageAnalyzer,
     ImageRepository,
+    ImageryProvider,
     ObjectStorage,
     PasswordHasher,
     RateLimiter,
+    SegmentationPort,
     TokenService,
     UnitOfWork,
     UserRepository,
@@ -95,6 +97,14 @@ def get_image_analyzer(request: Request) -> ImageAnalyzer:
 
 def get_vqa_model(request: Request) -> VqaModelPort:
     return request.app.state.vqa_model  # type: ignore[no-any-return]
+
+
+def get_imagery_provider(request: Request) -> ImageryProvider | None:
+    return request.app.state.imagery  # type: ignore[no-any-return]
+
+
+def get_segmenter(request: Request) -> SegmentationPort | None:
+    return request.app.state.segmenter  # type: ignore[no-any-return]
 
 
 def get_rate_limiter(
@@ -190,6 +200,7 @@ def get_image_service(
     images: Annotated[ImageRepository, Depends(get_image_repository)],
     storage: Annotated[ObjectStorage, Depends(get_storage)],
     analyzer: Annotated[ImageAnalyzer, Depends(get_image_analyzer)],
+    imagery: Annotated[ImageryProvider | None, Depends(get_imagery_provider)],
     audit: Annotated[AuditService, Depends(get_audit_service)],
     uow: Annotated[UnitOfWork, Depends(get_unit_of_work)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
@@ -202,6 +213,7 @@ def get_image_service(
         uow=uow,
         max_upload_size_bytes=settings.max_upload_size_bytes,
         thumbnail_max_size_px=settings.thumbnail_max_size_px,
+        imagery=imagery,
     )
 
 
@@ -209,6 +221,7 @@ def get_vqa_service(
     images: Annotated[ImageRepository, Depends(get_image_repository)],
     storage: Annotated[ObjectStorage, Depends(get_storage)],
     model: Annotated[VqaModelPort, Depends(get_vqa_model)],
+    segmenter: Annotated[SegmentationPort | None, Depends(get_segmenter)],
     queries: Annotated[VqaQueryRepository, Depends(get_vqa_query_repository)],
     audit: Annotated[AuditService, Depends(get_audit_service)],
     uow: Annotated[UnitOfWork, Depends(get_unit_of_work)],
@@ -222,6 +235,7 @@ def get_vqa_service(
         audit=audit,
         uow=uow,
         default_top_k=settings.vqa_top_k_alternatives,
+        segmenter=segmenter,
     )
 
 

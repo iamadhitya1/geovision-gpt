@@ -6,9 +6,15 @@ import { useCallback, useEffect, useState } from "react";
 import { AnswerComparison } from "@/components/AnswerComparison";
 import { AttentionOverlay } from "@/components/AttentionOverlay";
 import { AuthedImage } from "@/components/AuthedImage";
+import { HighlightOverlay } from "@/components/HighlightOverlay";
 import { api, ApiError } from "@/lib/api";
 import { FUSION_ORDER, MODEL_INFO, SUGGESTED_QUESTIONS, formatBytes } from "@/lib/models";
-import type { AttentionHeatmap, SatelliteImage, VqaQuery } from "@/lib/types";
+import type {
+  AttentionHeatmap,
+  ConceptHighlight,
+  SatelliteImage,
+  VqaQuery,
+} from "@/lib/types";
 
 function centreOf(bounds: [number, number, number, number]): string {
   const [minX, minY, maxX, maxY] = bounds;
@@ -28,6 +34,10 @@ function Readout({ image }: { image: SatelliteImage }) {
     if (m.cloud_cover_percent !== null) rows.push(["Cloud cover", `${m.cloud_cover_percent.toFixed(1)}%`]);
   }
   rows.push(["Format", `${image.image_format} · ${formatBytes(image.file_size_bytes)}`]);
+  // Scenes captured from the map are Sentinel-2 cloudless imagery, whose licence requires this.
+  if (image.original_filename.startsWith("sentinel2_")) {
+    rows.push(["Imagery", "Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020)"]);
+  }
 
   return (
     <dl className="divide-y divide-line font-mono text-xs">
@@ -53,6 +63,9 @@ export default function WorkspacePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [heatmap, setHeatmap] = useState<AttentionHeatmap | null>(null);
   const [explaining, setExplaining] = useState(false);
+  const [highlight, setHighlight] = useState<ConceptHighlight | null>(null);
+  const [highlighting, setHighlighting] = useState(false);
+  const [highlightError, setHighlightError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +90,8 @@ export default function WorkspacePage() {
       setError(null);
       setAsking(true);
       setHeatmap(null); // a new question invalidates any heatmap shown for the old one
+      setHighlight(null);
+      setHighlightError(null);
       try {
         const result = await api.ask(id, trimmed);
         setQueries((prev) => [result, ...prev]);
@@ -97,6 +112,7 @@ export default function WorkspacePage() {
         return;
       }
       setExplaining(true);
+      setHighlight(null); // one overlay on the image at a time
       try {
         setHeatmap(await api.explainAttention(id, forQuestion));
       } catch {
@@ -107,6 +123,28 @@ export default function WorkspacePage() {
       }
     },
     [id, heatmap],
+  );
+
+  const toggleHighlight = useCallback(
+    async (forQuestion: string) => {
+      if (highlight) {
+        setHighlight(null);
+        return;
+      }
+      setHighlighting(true);
+      setHighlightError(null);
+      setHeatmap(null); // one overlay on the image at a time
+      try {
+        setHighlight(await api.highlightConcept(id, forQuestion));
+      } catch (err) {
+        setHighlightError(
+          err instanceof ApiError ? err.message : "Couldn't highlight this. Try again.",
+        );
+      } finally {
+        setHighlighting(false);
+      }
+    },
+    [id, highlight],
   );
 
   if (loadError) {
@@ -141,7 +179,13 @@ export default function WorkspacePage() {
                 alt={image.original_filename}
                 className="aspect-square"
                 scanning={asking}
-                overlay={heatmap ? <AttentionOverlay heatmap={heatmap} /> : undefined}
+                overlay={
+                  highlight ? (
+                    <HighlightOverlay highlight={highlight} />
+                  ) : heatmap ? (
+                    <AttentionOverlay heatmap={heatmap} />
+                  ) : undefined
+                }
               />
             ) : (
               <div className="flex aspect-square items-center justify-center bg-raised font-mono text-xs text-faint">
@@ -149,6 +193,12 @@ export default function WorkspacePage() {
               </div>
             )}
           </div>
+          {heatmap && !highlight && (
+            <p className="font-mono text-[11px] leading-snug text-muted">
+              Amber = where the model&apos;s attention went while it answered. That is not a map of
+              the answer — use the highlight button for that.
+            </p>
+          )}
           <Readout image={image} />
         </aside>
 
@@ -207,6 +257,11 @@ export default function WorkspacePage() {
                 </button>
               ))}
             </div>
+            <p className="text-xs text-faint">
+              It answers four kinds of question: is something there, how many, a comparison of two
+              things, and rural or urban. Other wording is read as the closest of these; open-ended
+              questions (&quot;describe this&quot;, colours, sizes) aren&apos;t supported.
+            </p>
           </form>
 
           {error && (
@@ -223,6 +278,12 @@ export default function WorkspacePage() {
                 query={latest}
                 onExplain={() => void toggleExplain(latest.question)}
                 explainStatus={explaining ? "loading" : heatmap ? "shown" : "idle"}
+                highlight={{
+                  status: highlighting ? "loading" : highlight ? "shown" : "idle",
+                  onToggle: () => void toggleHighlight(latest.question),
+                  result: highlight,
+                  error: highlightError,
+                }}
               />
             </div>
           ) : (

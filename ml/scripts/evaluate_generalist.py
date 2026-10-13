@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dataset.rsvqa_lr_dataset import AnswerVocabulary
 from dataset.vqa_examples_dataset import VqaExamplesDataset, in_vocabulary
 from models.vqa_model import LitRSVQAModel, build_image_transform, build_tokenizer
+from scripts.count_bucket_eval import count_examples, evaluate_counts
 from scripts.train import evaluate, make_collate_fn, resolve_device
 from scripts.train_generalist import CHECKPOINT_DIR, load_examples
 
@@ -81,9 +82,22 @@ def main() -> None:
         print(f"  average accuracy: {metrics['average_accuracy']:.4f}")
         print(f"  per-type: {json.dumps(metrics['per_type_accuracy'])}")
 
+    # Written before the counting step so the long evaluation above is never lost to it.
     out_path = CHECKPOINT_DIR / f"{args.tag}_{args.which}_eval.json"
     out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nWritten: {out_path}")
+
+    # Counting scored the paper's way too (5 ranges), alongside the exact-match number above.
+    # Kept under its own key so the per-test-set entries keep their original shape.
+    counts = evaluate_counts(model, vocab, tokenizer, device, count_examples("test"), num_workers=3)
+    results["lr:test_count_bucketed"] = counts
+    print("\n=== lr:test counting, scored in the RSVQA paper's five ranges ===")
+    print(f"  exact match (in-vocab):   {counts['exact_match_in_vocab_numeric_only']:.4f}")
+    print(f"  bucketed (numeric-only):  {counts['bucketed_numeric_only']:.4f}")
+    print(f"  predicted ranges: {json.dumps(counts['predicted_bucket_distribution_numeric_only'])}")
+
+    out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    print(f"Written (with counting): {out_path}")
 
 
 if __name__ == "__main__":

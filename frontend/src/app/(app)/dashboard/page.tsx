@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { FUSION_ORDER, MODEL_INFO, formatConfidence } from "@/lib/models";
-import { QUESTION_ONLY, QUESTION_TYPES, RESULTS, TEST_SET_SIZE } from "@/lib/results";
+import {
+  COUNT_IN_RANGES,
+  QUESTION_ONLY,
+  QUESTION_TYPES,
+  RESULTS,
+  SEEDS,
+  TEST_SET_SIZE,
+} from "@/lib/results";
 import type { VqaStats } from "@/lib/types";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -53,7 +60,8 @@ function Benchmark() {
         <h2 className="font-display text-xl font-bold tracking-tight">Model accuracy</h2>
         <p className="mt-1 text-sm text-muted">
           Measured on RSVQA-LR&apos;s held-out test split ({TEST_SET_SIZE.toLocaleString()} questions the
-          models never saw during training).
+          models never saw during training). Each figure is the mean of {SEEDS} separate training
+          runs; ± is how much those runs differed.
         </p>
       </div>
 
@@ -70,7 +78,9 @@ function Benchmark() {
                   {r ? `${r.average.toFixed(1)}%` : "—"}
                 </div>
                 <div className="font-mono text-[11px] text-muted">
-                  {r ? `average accuracy · ${r.overall.toFixed(1)}% overall` : "training run in progress"}
+                  {r
+                    ? `average accuracy · ${r.overall.toFixed(1)}% overall (±${r.overallSpread.toFixed(1)})`
+                    : "training run in progress"}
                 </div>
               </div>
             );
@@ -107,17 +117,35 @@ function Benchmark() {
               </div>
             </div>
           ))}
+
+          <div className="grid gap-1 sm:grid-cols-[11rem_1fr] sm:items-center sm:gap-4">
+            <div>
+              <div className="text-sm">Counting, in ranges</div>
+              <div className="text-[11px] text-faint">
+                0 / 1–10 / 11–100 / 101–1,000 / 1,000+ · {COUNT_IN_RANGES.n.toLocaleString()} questions
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <AccuracyBar fusion="elementwise" value={COUNT_IN_RANGES.elementwise} />
+              <AccuracyBar fusion="cross_attention" value={COUNT_IN_RANGES.cross_attention} />
+              <AccuracyBar fusion="question_only" value={COUNT_IN_RANGES.question_only} />
+            </div>
+          </div>
         </div>
 
         <div className="mt-5 space-y-2 border-t border-line pt-4 text-xs leading-relaxed text-muted">
           {both ? (
             <p>
-              <span className="text-text">Overall, the two models are effectively tied</span>:{" "}
-              {Math.abs(overallGap).toFixed(1)} points apart on {TEST_SET_SIZE.toLocaleString()} questions.
-              Cross-attention is slightly ahead on counting and slightly behind on comparison. The
-              larger gap in <em>average</em> accuracy comes from rural/urban, which has only{" "}
-              {QUESTION_TYPES[0].n} test questions but counts for a quarter of that average. Each model
-              was trained once, so gaps this small shouldn&apos;t be read as a real difference.
+              <span className="text-text">
+                Across {SEEDS} training runs each, the simple elementwise model comes out ahead
+              </span>
+              : {Math.abs(overallGap).toFixed(1)} points overall on {TEST_SET_SIZE.toLocaleString()}{" "}
+              questions, and all three elementwise runs scored above all three cross-attention runs
+              (at the closest by 0.06 points, so this is a consistent edge, not a large one). The richer
+              cross-attention fusion is also less steady from run to run. Its lower <em>average</em>{" "}
+              accuracy comes mostly from rural/urban, which has only {QUESTION_TYPES[0].n} test
+              questions and swung between 54% and 89% across its runs — read that row with care. An
+              earlier comparison of one run each showed them tied; that turned out to be luck of the draw.
             </p>
           ) : (
             <p>The cross-attention numbers appear here as soon as its evaluation finishes.</p>
@@ -128,12 +156,22 @@ function Benchmark() {
             already scores {QUESTION_ONLY.overall.toFixed(1)}% overall ({QUESTION_ONLY.average.toFixed(1)}%
             average), because this dataset&apos;s questions are templated. The models beat it by about
             two points overall: clearly on rural/urban ({QUESTION_ONLY.byType.rural_urban.toFixed(0)}%
-            → 92% and 81%), slightly on presence and comparison, and not at all on counting.
+            → about 89% and 74%, the three-run means), slightly on presence and comparison, and not at all on counting when it
+            has to be an exact number.
           </p>
           <p>
-            Counting is the hard case for every model of this size. The published LiT-4-RSVQA paper
-            reports 64.6%, but it trained on a much larger dataset, so that comparison is indicative,
-            not like-for-like.
+            <span className="text-text">Counting is far better than the exact-match bar suggests.</span>{" "}
+            Nobody can read &quot;158 buildings&quot; versus &quot;159&quot; from 10 m imagery, so the original
+            RSVQA paper scores counts in five ranges, and so does the last row above (the app answers
+            count questions this way too). Placing a count in the right range, the elementwise model
+            gets {COUNT_IN_RANGES.elementwise.toFixed(1)}% and cross-attention{" "}
+            {COUNT_IN_RANGES.cross_attention.toFixed(1)}%, against {COUNT_IN_RANGES.question_only.toFixed(1)}%
+            for a no-image guess. So the image genuinely helps the elementwise model on counting (about{" "}
+            {Math.round(COUNT_IN_RANGES.elementwise - COUNT_IN_RANGES.question_only)} points), while
+            cross-attention does barely better than guessing from the question alone. That gap held up
+            across training runs (elementwise on {COUNT_IN_RANGES.elementwise_runs} runs, cross-attention
+            on {COUNT_IN_RANGES.cross_attention_runs}). The original RSVQA paper reported 67% on this
+            task, but that isn&apos;t a like-for-like comparison: it used different models and training.
           </p>
         </div>
       </div>

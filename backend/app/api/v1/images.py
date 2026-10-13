@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import Response
 
 from app.api.deps import ResearcherUser, get_image_service, get_request_context
-from app.application.dto import ImageRead, MessageResponse, Page, RequestContext
+from app.application.dto import (
+    CaptureSceneRequest,
+    ImageRead,
+    MessageResponse,
+    Page,
+    RequestContext,
+)
 from app.application.image_service import ImageService
 from app.domain.enums import ImageFormat, ImageStatus
 from app.domain.errors import FileTooLargeError
@@ -72,6 +78,34 @@ async def upload_image(
         owner=researcher,
         filename=file.filename or "upload",
         data=data,
+        context=context,
+    )
+    return ImageRead.from_domain(image)
+
+
+@router.post(
+    "/capture",
+    response_model=ImageRead,
+    status_code=201,
+    summary="Fetch a satellite scene for a point on the map",
+    responses={
+        502: {"description": "The imagery service couldn't be reached, or has nothing there"},
+    },
+)
+async def capture_scene(
+    request: CaptureSceneRequest,
+    researcher: ResearcherUser,
+    service: ImageServiceDep,
+    context: ContextDep,
+) -> ImageRead:
+    """Cuts a 256 x 256 px, ~10 m per pixel scene (2.56 km across) from the Sentinel-2
+    cloudless mosaic, centred on the point, and stores it as the caller's own image — the same
+    shape of data the models were trained on, so a question about it is a fair one. From
+    there it behaves exactly like an uploaded file."""
+    image = await service.capture_scene(
+        owner=researcher,
+        latitude=request.latitude,
+        longitude=request.longitude,
         context=context,
     )
     return ImageRead.from_domain(image)

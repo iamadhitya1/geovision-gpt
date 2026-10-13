@@ -395,7 +395,7 @@
     <div class="meta-row">
       <span>STATUS: MODEL TRAINED &amp; TESTED · WIDENED FOR GENERALISATION · WEB APP COMPLETE · DEMO-READY</span>
       <span>REPO: geovision-gpt</span>
-      <span>UPDATED 2026-10-01</span>
+      <span>UPDATED 2026-10-06</span>
     </div>
   </div>
 </header>
@@ -497,7 +497,7 @@
             <tr><td class="num">11</td><td class="num">21 Sep</td><td class="name">Honest evaluation: no-image floor, robustness</td><td class="scope">Image adds ~2 points; dimming breaks rural/urban</td></tr>
             <tr><td class="num">12</td><td class="num">21 Sep</td><td class="name">Backup and documentation</td><td class="scope">Private GitHub repo, restore-tested</td></tr>
             <tr><td class="num">13</td><td class="num">22–23 Sep</td><td class="name">Widening the model: elementwise fusion</td><td class="scope">No regression on RSVQA-LR; generalises to an unseen city; robustness fixed (62%→88%)</td></tr>
-            <tr><td class="num">14</td><td class="num">23–24 Sep</td><td class="name">Widening the model: cross-attention fusion</td><td class="scope">Same generalisation and robustness gains confirmed; still tied with elementwise</td></tr>
+            <tr><td class="num">14</td><td class="num">23–24 Sep</td><td class="name">Widening the model: cross-attention fusion</td><td class="scope">Same generalisation and robustness gains confirmed; tied with elementwise</td></tr>
             <tr><td class="num">15</td><td class="num">1 Oct</td><td class="name">Significance test + attention heatmap</td><td class="scope">Tie confirmed statistically (p=0.84); cross-attention's focus shown live, concentrated correctly</td></tr>
           </tbody>
         </table>
@@ -654,7 +654,7 @@
             <li><strong>Why:</strong> Step 09's baseline-vs-cross-attention comparison was the project's own experiment. Widening only the elementwise model would have quietly dropped that comparison — so the same recipe was retrained with cross-attention fusion instead.</li>
             <li>Same setup: RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, one training job, evaluated on all three test sets, then robustness-checked with the same perturbations as Step 11.</li>
           </ul>
-          <p class="result"><strong>Result:</strong> 71.96% / 73.91% on RSVQA-LR — still tied with elementwise (72.02% / 73.65%), confirming the richer fusion still doesn't measurably help after widening. The unseen-city gap is about 6 points (80.4%→74.4%), the same size as elementwise's — so both fusion styles generalise similarly. The robustness fix holds too: rural/urban's darker-image drop shrinks from 15 points (original cross-attention model) to 3. Both widened models now run side by side in the live app.</p>
+          <p class="result"><strong>Result:</strong> 71.96% / 73.91% on RSVQA-LR — tied with elementwise (72.02% / 73.65%) <em>on this first run</em> (three runs later showed elementwise modestly ahead; see the 2026-10-08 update above). The unseen-city gap is about 6 points (80.4%→74.4%), the same size as elementwise's — so both fusion styles generalise similarly. The robustness fix holds too: rural/urban's darker-image drop shrinks from 15 points (original cross-attention model) to 3. Both widened models now run side by side in the live app.</p>
         </li>
 
         <li>
@@ -668,7 +668,7 @@
               something sensible" had no evidence either way.</li>
             <li><strong>Significance test</strong> (<code>scripts/significance_test.py</code>):
               McNemar's exact test and a 10,000-resample paired bootstrap, run over all 9,838
-              RSVQA-LR test questions for both widened models. Confirms the tie directly: p=0.84,
+              RSVQA-LR test questions for both widened models. Found no difference between the two <em>seed-0</em> models: p=0.84,
               95% CI on the gap is [−0.43%, +0.55%]. One honest nuance surfaced by testing each
               question type separately: comparison questions show a borderline signal (p=0.048)
               favouring elementwise, but it doesn't survive correcting for testing four types at
@@ -720,7 +720,7 @@
             model's insides, so this is where the failed-attempt story and the no-image baseline
             count for the most.</li>
           <li><strong>Either way:</strong> say what the project is not — it can't write sentences,
-            it can't count, and the two models tied. Saying it first reads as control.</li>
+            it can't count, and the first-run comparison was a tie that three runs later turned into a small elementwise lead. Saying it first reads as control.</li>
         </ul>
 
         <h3>If you use slides — 11 that cover everything</h3>
@@ -886,7 +886,7 @@
             <tr><td class="name">Architecture</td><td class="scope">BERT-Tiny + XCiT-Nano + a fusion module + MLP classifier — 8.2M parameters (elementwise), 9.3M (cross-attention)</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Original single-dataset training (superseded, kept for reference)</td><td class="scope">10 epochs, about 73–91 minutes each. Elementwise 72.74% / 75.16%, cross-attention 72.33% / 72.29% on RSVQA-LR's test split — see §06 for the robustness weakness this exposed</td><td><span class="pill live">Done</span></td></tr>
             <tr><td class="name">Widened training — what the app serves</td><td class="scope">Both fusions retrained on RSVQA-LR + RSVQA-HR with augmentation, 8 epochs, about 95 minutes each. No regression on RSVQA-LR, generalises to an unseen city, and the robustness weakness is fixed — full numbers in §06</td><td><span class="pill live">Done</span></td></tr>
-            <tr><td class="name">Significance test + attention heatmap</td><td class="scope">McNemar's test + bootstrap confirm the elementwise/cross-attention tie (p=0.84); cross-attention's per-patch attention exposed as a live, toggleable heatmap on the answer card</td><td><span class="pill live">Done</span></td></tr>
+            <tr><td class="name">Significance test + attention heatmap</td><td class="scope">McNemar's test + bootstrap found no difference between the two seed-0 models (p=0.84; superseded by the three-run comparison); cross-attention's per-patch attention exposed as a live, toggleable heatmap on the answer card</td><td><span class="pill live">Done</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -929,7 +929,10 @@
         <p class="lead">These are the widened models — trained on RSVQA-LR and RSVQA-HR
           together — measured on RSVQA-LR's official held-out test split (9,838 questions the
           models never saw during training) so they stay directly comparable to the original
-          single-dataset numbers below. Each model was trained once.</p>
+          single-dataset numbers below. <strong>Updated 2026-10-08:</strong> each model was then trained
+          three times with different random seeds; the figures in the dashboard and in the next
+          paragraphs are the means of those three runs, and the tables further down this page that
+          show 72.02% / 71.96% are the first run only.</p>
       </div>
 
       <div class="table-wrap">
@@ -950,19 +953,29 @@
 
       <div class="prose">
         <h3>How to read it honestly</h3>
-        <p><strong>The two are still effectively tied</strong> — the same as before widening.
-          Overall they differ by 0.06 points, about 6 questions out of 9,838. On every
-          category the models are within about a point of each other. Widening the training
-          data didn't change which fusion wins; it changed how far both generalise (below).</p>
-        <p><strong>What you can and can't claim.</strong> You can say cross-attention still did
-          not measurably improve on elementwise fusion, at about 13% more parameters, and that
-          this held before <em>and</em> after widening the training data — a more robust
-          negative result than a single comparison would be. You can't say either fusion is
-          better. Counting is weak for both (about 28%), consistent with it being the hardest
-          question type for small VQA models generally.</p>
-        <p><strong>This is no longer just an impression — it's measured.</strong> A significance
+        <p><strong>With three runs each, the simple elementwise model is a little ahead — and
+          steadier.</strong> On the standard test set it scores 72.5% against cross-attention's
+          71.2% (means; a difference of 1.4 points), on the large aerial set 82.7% against 78.7%.
+          On both, <em>every</em> elementwise run beat <em>every</em> cross-attention run — on the
+          standard test set by as little as 0.06 points, so it's a small but consistent edge. On the
+          unseen city (Philadelphia) the runs overlap, so that test alone doesn't separate them
+          (77.4% against 76.1%). Cross-attention also varies more from run to run. A fourth elementwise run, evaluated later, agrees (72.7% / 83.2% / 79.3% on the same three tests). The
+          single-run comparison in the next paragraphs — 72.02% against 71.96%, a "tie" — was seed 0
+          and, it turned out, luck.</p>
+        <p><strong>What you can and can't claim.</strong> You can say the richer fusion did not
+          help, at about 13% more parameters, and that this held across both training setups and
+          three training runs each; that elementwise is modestly but consistently ahead on two of
+          three test sets; and that cross-attention is less stable. You can't say the difference is
+          <em>statistically significant</em>: with three runs a side, an exact rank test can't go
+          below p = 0.10 (all three above all three is 1 of 20 orderings, one-sided 0.05). It's
+          replicated evidence of a modest edge, not proof. Counting is about 28% for both
+          <em>if you demand the exact number</em> — but that is the wrong test at 10 m per pixel;
+          scored in the five ranges the original paper uses, elementwise gets about 68% and
+          cross-attention about 59%, against 58% for a guess that never looks at the image — see
+          "Counting" in the Q&amp;A below.</p>
+        <p><strong>The seed-0 significance test — superseded.</strong> A significance
           test (McNemar's exact test, plus a 10,000-resample paired bootstrap, both over all
-          9,838 test questions) confirms the tie directly: p = 0.84, and the 95% confidence
+          9,838 test questions) on the two <em>seed-0</em> models found no difference: p = 0.84, and the 95% confidence
           interval on the accuracy gap is [−0.43%, +0.55%] — comfortably containing zero. One
           honest nuance: broken down by question type, comparison questions alone show a
           borderline result (elementwise ahead, p = 0.048) — but that doesn't survive correction
@@ -1036,8 +1049,10 @@
           the most common training answer to that exact question scores <strong>70.42% overall</strong>
           — because RSVQA-LR's questions are templated. So both models beat it by only about 1.5–1.6
           points overall. The image clearly matters for rural/urban (56% → 88% and 89%), adds a little on
-          presence and comparison, and adds <strong>nothing on counting</strong>: both models are
-          level with always saying "0". This is a known weakness of templated benchmarks, not of
+          presence and comparison, and adds <strong>nothing on <em>exact</em> counting</strong>: both models are
+          level with always saying "0" (scored in ranges the picture changes — the image then adds
+          about 10 points for elementwise and 4 for cross-attention; see "Counting" below).
+          This is a known weakness of templated benchmarks, not of
           your implementation — but it is the honest floor to judge the models against, and an
           examiner may well ask. The dashboard shows it as a grey bar, and
           <code>ml/scripts/question_only_baseline.py</code> reproduces it in one command.</p>
@@ -1139,9 +1154,25 @@
       <div class="prose">
         <h3>Avoid, and why</h3>
         <ul class="plain">
-          <li><strong>Counts above zero</strong> ("How many buildings are there?"). Counting is the
-            weak spot: both models are no better than always answering the most common count
-            (about 28%). If someone asks, say so and point at the dashboard.</li>
+          <li><strong>Asking for an exact count.</strong> The app now answers counts as a range
+            ("101 to 1,000") on purpose. Exact numbers aren't readable at 10 m per pixel (about 28%
+            by exact match; about 68% placed in the right range). If someone wants the exact
+            number, say so and point at the dashboard's two counting rows. The two models often
+            differ on counts — expected.</li>
+          <li><strong>"Is there a road?" on <code>246.tif</code></strong> (mostly open sea with a beach):
+            both models say "yes" at 99–100%, and the dataset's own label agrees (OpenStreetMap records
+            about 31 road segments there, mostly small tracks), so it is correct — but it looks wrong at
+            10 m per pixel and the highlight draws only thin strips. Say where the label comes from, or
+            stick to rural/urban and the water highlight on this image.</li>
+          <li><strong>The amber "show model attention" overlay as if it located the answer.</strong>
+            It shows where the model's attention went, not where the answer is — on a water question
+            it can light up the green fields around. Use the highlight button for locating.</li>
+          <li><strong>A highlight with no internet and no stored map data.</strong> Run
+            <code>python scripts/warm_map_cache.py</code> once at home, online, for the places you
+            will click; those then work instantly and offline.</li>
+          <li><strong>Random new places on the live map.</strong> Cross-attention called Ahmedabad's
+            centre and Mumbai harbour "rural" at 99% while elementwise got them right. Rehearse the
+            places you click; treat a disagreement as something to point out.</li>
           <li><strong>Open-ended questions</strong> ("describe this"). The models pick from a fixed
             list of 1,000 answers. The app shows a low-confidence warning when it's close to
             guessing.</li>
@@ -1468,10 +1499,13 @@
           about 8 million — and would need far more computing power and training data than a
           student project on a shared university GPU realistically has. Picking from a fixed list
           is what lets a model this small actually work well, and it's the same approach the
-          published research this project follows uses. You can still type a question in your own
-          words — the model does its best to match it to what it learned — but it works best on
-          the plain, direct style of question it was actually trained on: "Is there a road?", "How
-          many buildings are there?", "Is this a rural or an urban area?"</p>
+          published research this project follows uses. The app checks every question first. It answers exactly four kinds — is something there, how many,
+          a comparison of two things, and rural-or-urban — about things the training questions used
+          (buildings, roads, water areas, grass, forests, farmland and a few others). If you word it
+          differently, it reads it as the nearest of those and tells you ("Is there a river?" → "Is there
+          a water area?"). If it is a different kind of question — "describe this image", "what colour is
+          the water?", "how wide is the road?" — it declines and lists what it can answer, rather than
+          giving a confident guess. The full list is in the demo runbook.</p>
       </div>
 
       <div class="qa">
@@ -1505,8 +1539,8 @@
           real difference?"</p>
         <p class="a">It's measured now, not guessed. I ran a statistical test — the kind used to
           check whether two things that look similar are actually the same, or just happened to
-          land close together by chance — over all 9,838 held-out questions. It confirms the tie
-          directly: there's a 95% chance the true difference between the two models is somewhere
+          land close together by chance — over all 9,838 held-out questions, on the first trained pair
+          of models. It found no difference between that pair: there's a 95% chance the true difference between the two models is somewhere
           between a third of a point in either direction, which is about as clean a "no real
           difference" as you can get. One honest exception: comparison-type questions alone showed
           a borderline signal favouring the simpler model, but it doesn't survive a standard
@@ -1529,13 +1563,18 @@
 
       <div class="qa">
         <p class="q">"Did cross-attention beat the baseline?"</p>
-        <p class="a">No — it tied it, both before and after I widened the training data. Most
-          recently: 71.96% against 72.02% overall on 9,838 held-out questions. Each model was
-          trained once, so the honest conclusion is that the richer fusion didn't measurably
-          help here, at about 13% more parameters — and that held up across two completely
-          different training setups, which makes it a more robust negative result than a
-          single comparison would be. Repeating runs with different seeds would be the next
-          step.</p>
+        <p class="a">No — and a repeat showed it did slightly worse. My first comparison, one training
+          run each, looked like a tie: 71.96% against 72.02% overall on 9,838 held-out questions. I
+          didn't trust a single run, so I trained each design three times with different random
+          seeds. Averaged, the simple model is ahead: 72.5% against 71.2% on that test set, and 82.7%
+          against 78.7% on the large aerial set, with every elementwise run above every cross-attention
+          run on both. On the unseen city the runs overlap. Cross-attention is also less steady from
+          run to run, and on counting it is barely better than guessing. So the honest answer is that
+          the richer fusion didn't help here, at about 13% more parameters, and the original "tie" was
+          luck of one seed.
+          <span class="flag">Don't say "proved" or "significantly worse": with three runs a side the
+          strongest exact test gives p = 0.10. Say "consistently, modestly worse, and less stable".
+          The seed-0 "tie" is a good story to tell on yourself — it's why you repeat runs.</span></p>
       </div>
 
       <div class="qa">
@@ -1608,12 +1647,15 @@
       <div class="qa">
         <p class="q">"What are the limits?"</p>
         <p class="a">It answers from a fixed list of 1,000 answers, so it can't write free text
-          or answer questions outside that vocabulary. Counting is weak (about 28%). It now
+          or answer questions outside that vocabulary. Exact counting is weak (about 28%; in ranges,
+          about 68% / 62%). It can't point at where the answer is — the highlight is a separate
+          zero-shot step — and it can't measure lengths or areas. It now
           generalises across two datasets and an unseen city, but that's still Sentinel-2 and
           15cm aerial imagery specifically — an unfamiliar sensor or a resolution far outside
           that range would likely need fine-tuning. Half-resolution robustness only improved for
           one of the two fusions, and scale sensitivity (a heavily zoomed crop) isn't fully
-          solved. Each model was trained once. And the test sets are narrower than newer
+          solved. Each model was trained three times (the app serves the first run of each). Three runs is
+          small. And the test sets are narrower than newer
           benchmarks like RSVLM-QA.</p>
       </div>
 
@@ -1635,7 +1677,8 @@
           answers with the most common training answer to each exact question scores 70.4% overall on
           the test set; my models score 72.0% and 72.0%. So the image adds about a point and a half
           overall. It clearly matters for rural/urban — 56% without the image, 88% and 89% with it — helps a
-          little on presence and comparison, and doesn't help counting at all. That's a known
+          little on presence and comparison, and doesn't help <em>exact</em> counting at all (in ranges
+          it does help: 68% / 62% against 58% without the image). That's a known
           weakness of templated benchmarks like RSVQA, and it's why I show the no-image bar next to
           the models on the dashboard.
           <span class="flag">Lead with it before you're asked. It turns the strongest objection
@@ -1738,18 +1781,75 @@
         <p class="q">"Did you use AI tools to build this?"</p>
         <p class="a">Answer truthfully and within your institute's rules. If it's accurate for you:
           "Yes — I used an AI coding assistant for implementation. I made the decisions — the pivot,
-          the model choice, the cross-attention experiment, reporting the tie honestly — and I can
+          the model choice, the cross-attention experiment, reporting the results honestly, including that the first-run tie didn't survive repeating the runs — and I can
           explain, run and reproduce every part; I found and diagnosed the cross-attention bug from
           the training curve." Then prove it by explaining something. Never claim to have hand-written
           what you didn't.</p>
       </div>
 
       <div class="qa">
+        <p class="q">"Can it count?"</p>
+        <p class="a">It answers counts as a <em>range</em>: none, 1–10, 11–100, 101–1,000 or more
+          than 1,000 — the same way the original benchmark paper scores counting, because nobody
+          can read "158 buildings" versus "159" from satellite imagery at 10 m per pixel. Scored
+          that way the elementwise model is right about 68% of the time and cross-attention about 59%,
+          against 57.9% for a guess that never looks at the picture — so for cross-attention the
+          picture adds almost nothing on counting. Scored by exact number it's
+          about 28%, which is why that figure alone looked hopeless: it was the wrong test, and a
+          decoding quirk (one very common answer, "0", beating a whole range) made it worse for the
+          fancier model. I found this by checking how the paper scores it and measuring both ways.
+          <span class="flag">Two honest limits: the headline elementwise figure is the mean of three runs (68.1,
+          68.5, 67.6), and a separate re-scoring of seeds 0–2 gave 68.0, 67.9 and 68.4, so it's stable; the ~10-point gap between the fusions held on all three cross-attention
+          runs. And my 68% isn't a like-for-like comparison with the paper's 67% — different models
+          and training. Don't claim to have beaten it.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Can it show where the answer is — like segmentation?"</p>
+        <p class="a">The model that answers can't — it only picks a label; it was never shown an
+          outline of anything, and none of my datasets contain outlines. So I added a separate step
+          that points at the answer, and the method depends on what you ask. Vegetation and water I
+          find from the image itself: a plain colour test, and a ready-made text-prompted segmenter
+          called CLIPSeg. But at 10 metres per pixel a road is about one pixel wide, and a forest
+          looks like any other green field — so for roads, buildings, forest, grass, farmland and
+          cemeteries I draw OpenStreetMap map data at the scene's coordinates instead, and the app
+          says on screen, for each highlight, whether it came from the image or from map data. The
+          answering model decides whether the thing is there; this only shows where. For a
+          comparison question ("more roads than buildings?") it highlights both, in two colours. I
+          haven't measured segmentation accuracy — there are no labelled outlines to measure
+          against — so I describe it as a demonstrated pointer, not a result. A real fix would train
+          a segmenter on a labelled land-cover dataset; that's future work.
+          <span class="flag">Be upfront that the road/building highlight is map data, not the model
+          "seeing" them — it's the honest framing, and it's what the app itself says.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Can it measure length or area?"</p>
+        <p class="a">No, and the dataset is why: it has no length or distance questions, and the
+          high-resolution dataset's area questions are exact measurements like "521m2" that a
+          pick-from-a-list model can't produce, so I left them out. Measuring would need a model
+          that finds the object's outline plus the picture's metres-per-pixel — which the app
+          already reads from the GeoTIFF. A natural next step, not something it does today.</p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Is the live map like Google Earth?"</p>
+        <p class="a">It's a live map you can search and pan, and "Analyse this place" fetches a
+          satellite scene for that spot and asks the models about it. I deliberately use Sentinel-2
+          imagery at about 10 metres per pixel instead of a sharp screenshot, because that's the
+          scale the models were trained on and my own robustness study shows they get misled by very
+          different scales. So: any place on Earth, but not Google Earth's resolution. And I show it
+          on places I've rehearsed — on dense cities one model can still be confidently wrong
+          (cross-attention called Ahmedabad's centre "rural" at 99%; elementwise got it right).</p>
+      </div>
+
+      <div class="qa">
         <p class="q">"What would you do next?"</p>
         <p class="a">Repeat each run with several random seeds to measure run-to-run noise; move to a
           larger benchmark such as RSVLM-QA; visualise which patches each word attends to, to see if
-          cross-attention learns something sensible; try to fix counting, which is stuck at the
-          no-image level; close the remaining scale/zoom sensitivity that the widened training didn't
+          cross-attention learns something sensible; train a real segmenter for the highlights (it needs a labelled land-cover dataset);
+          settle whether cross-attention's weaker counting and its confident mistakes on dense
+          cities are real or seed luck, which the repeat-seed runs will show; close the remaining scale/zoom sensitivity that the widened training didn't
           fully fix; and compare against a larger model to put a number on the small-model
           trade-off.</p>
       </div>
@@ -1768,7 +1868,7 @@
             assistant. If you're asked, answer truthfully and within your institute's rules — don't
             claim to have hand-written what you didn't. A defensible position, <em>if it is true for
             you</em>: "I set the direction — the pivot, the model, the cross-attention experiment,
-            the choice to report the tie honestly — and used an assistant for implementation. I can
+            the choice to report the results honestly (including that the first-run tie didn't survive three runs) — and used an assistant for implementation. I can
             explain, run and reproduce every part." That last sentence has to be real, which is
             what the checklist below is for.</p>
         </div>
@@ -1840,7 +1940,7 @@
 </div>
 
 <footer>
-  Living reference, not a final script. Updated 2026-10-01 with two further results on top
+  Living reference, not a final script. Updated 2026-10-08 with three training runs per fusion — the first-run "tie" turned out to be seed luck; elementwise is modestly, consistently ahead and steadier (72.5% vs 71.2% on RSVQA-LR, 82.7% vs 78.7% on RSVQA-HR), and counting in ranges is ~68% vs ~59% against a 57.9% no-image floor. 2026-10-06/07 added counting scored in ranges, answer highlighting (map data for roads, buildings and similar) and a live map that analyses Sentinel-2 scenes of any place — described in the Q&amp;A above. Earlier, on 2026-10-01, two further results were added on top
   of the widened models (elementwise 72.02% / 73.65%, cross-attention 71.96% / 73.91% on the
   RSVQA-LR test split — original single-dataset numbers, 72.74% / 75.16% and 72.33% / 72.29%,
   kept for reference): a significance test confirming the elementwise/cross-attention tie

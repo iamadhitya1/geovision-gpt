@@ -6,23 +6,34 @@ test_unit_security.py isolates password/token logic from the rest of the stack.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID, uuid4
 
 import pytest
 
 from app.application.audit_service import AuditService
 from app.application.vqa_service import VqaService
+from app.domain.concepts import HighlightConcept
 from app.domain.entities import (
     AnswerAlternative,
     AttentionHeatmap,
     AuditEvent,
+    ConceptHighlight,
+    HighlightLayer,
+    ImageMetadata,
     SatelliteImage,
     User,
     VqaAnswer,
     VqaQuery,
 )
 from app.domain.enums import FusionType, ImageFormat, ImageStatus, Role
-from app.domain.errors import ImageNotReadyError, ModelUnavailableError, NotFoundError
+from app.domain.errors import (
+    ImageNotReadyError,
+    ModelUnavailableError,
+    NotFoundError,
+    NothingToHighlightError,
+    UnsupportedQuestionError,
+)
 
 # --- Fakes ---------------------------------------------------------------------
 
@@ -79,6 +90,7 @@ class FakeVqaModel:
     ) -> None:
         self._loaded = loaded
         self._failing = failing_fusions
+        self.asked: list[str] = []
 
     def available_fusions(self) -> frozenset[FusionType]:
         return self._loaded
@@ -86,6 +98,7 @@ class FakeVqaModel:
     async def predict(
         self, image_data: bytes, question: str, *, fusion: FusionType, top_k: int = 3
     ) -> VqaAnswer:
+        self.asked.append(question)
         if fusion not in self._loaded:
             raise ModelUnavailableError(fusion=fusion.value)
         if fusion in self._failing:
@@ -109,6 +122,31 @@ class FakeVqaModel:
             grid_size=grid_size,
             weights=tuple(1.0 / n for _ in range(n)),
         )
+
+
+class FakeSegmenter:
+    """Records what it was asked to locate and where; returns a fixed highlight."""
+
+    def __init__(self) -> None:
+        self.requested: list[tuple[HighlightConcept, ...]] = []
+        self.bounds_seen: list[tuple[float, float, float, float] | None] = []
+
+    async def highlight(
+        self,
+        image_data: bytes,
+        concepts: Sequence[HighlightConcept],
+        *,
+        bounds_wgs84: tuple[float, float, float, float] | None = None,
+    ) -> ConceptHighlight:
+        self.requested.append(tuple(concepts))
+        self.bounds_seen.append(bounds_wgs84)
+        layers = tuple(
+            HighlightLayer(
+                concept=c.value, label=c.value, color="#ffffff", coverage=0.25, method="fake"
+            )
+            for c in concepts
+        )
+        return ConceptHighlight(layers=layers, overlay_png=b"png")
 
 
 class FakeVqaQueryRepository:
@@ -183,6 +221,7 @@ def _build_service(
     image: SatelliteImage,
     model: FakeVqaModel,
     audit_repo: FakeAuditRepository | None = None,
+    segmenter: FakeSegmenter | None = None,
 ) -> VqaService:
     audit_repo = audit_repo or FakeAuditRepository()
     return VqaService(
@@ -193,6 +232,7 @@ def _build_service(
         audit=AuditService(audit_repo),  # type: ignore[arg-type]
         uow=FakeUnitOfWork(),  # type: ignore[arg-type]
         default_top_k=3,
+        segmenter=segmenter,  # type: ignore[arg-type]
     )
 
 
@@ -210,6 +250,49 @@ async def test_ask_returns_an_answer_from_every_loaded_fusion() -> None:
     assert len(query.answers) == 2
     assert query.answer_for(FusionType.ELEMENTWISE) is not None
     assert query.answer_for(FusionType.CROSS_ATTENTION) is not None
+
+
+async def test_ask_rewords_a_loosely_worded_question_and_says_so() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE}))
+    service = _build_service(image=image, model=model)
+
+    query = await service.ask(
+        image_id=image.id, question="Is there a river?", requesting_user=owner
+    )
+
+    assert model.asked == ["Is there a water area?"]
+    assert query.question == "Is there a river?"  # what the user typed is what is kept
+    note = query.answers[0].note
+    assert note is not None and "Is there a water area?" in note
+
+
+async def test_ask_passes_a_template_question_through_unchanged_and_without_a_note() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE}))
+    service = _build_service(image=image, model=model)
+
+    query = await service.ask(
+        image_id=image.id, question="Is a road present?", requesting_user=owner
+    )
+
+    assert model.asked == ["Is a road present?"]
+    assert query.answers[0].note is None
+
+
+async def test_ask_turns_away_a_question_the_model_cannot_answer_without_running_it() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    model = FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE}))
+    service = _build_service(image=image, model=model)
+
+    with pytest.raises(UnsupportedQuestionError) as excinfo:
+        await service.ask(image_id=image.id, question="Describe this image.", requesting_user=owner)
+
+    assert model.asked == []
+    assert "Is there a road?" in excinfo.value.message  # it says what can be asked
 
 
 async def test_ask_scopes_to_requested_fusions_only() -> None:
@@ -237,7 +320,7 @@ async def test_ask_raises_not_found_for_someone_elses_image() -> None:
     service = _build_service(image=image, model=model)
 
     with pytest.raises(NotFoundError):
-        await service.ask(image_id=image.id, question="Q", requesting_user=stranger)
+        await service.ask(image_id=image.id, question="Is there a road?", requesting_user=stranger)
 
 
 async def test_ask_raises_not_ready_for_an_unprocessed_image() -> None:
@@ -248,7 +331,7 @@ async def test_ask_raises_not_ready_for_an_unprocessed_image() -> None:
     service = _build_service(image=image, model=model)
 
     with pytest.raises(ImageNotReadyError):
-        await service.ask(image_id=image.id, question="Q", requesting_user=owner)
+        await service.ask(image_id=image.id, question="Is there a road?", requesting_user=owner)
 
 
 async def test_ask_keeps_successful_answers_when_one_fusion_fails() -> None:
@@ -263,7 +346,7 @@ async def test_ask_keeps_successful_answers_when_one_fusion_fails() -> None:
     audit_repo = FakeAuditRepository()
     service = _build_service(image=image, model=model, audit_repo=audit_repo)
 
-    query = await service.ask(image_id=image.id, question="Q", requesting_user=owner)
+    query = await service.ask(image_id=image.id, question="Is there a road?", requesting_user=owner)
 
     assert len(query.answers) == 1
     assert query.answers[0].fusion is FusionType.ELEMENTWISE
@@ -284,7 +367,7 @@ async def test_ask_admin_can_query_any_users_image() -> None:
     model = FakeVqaModel(loaded=frozenset({FusionType.ELEMENTWISE}))
     service = _build_service(image=image, model=model)
 
-    query = await service.ask(image_id=image.id, question="Q", requesting_user=admin)
+    query = await service.ask(image_id=image.id, question="Is there a road?", requesting_user=admin)
     assert len(query.answers) == 1
 
 
@@ -333,6 +416,154 @@ async def test_explain_raises_not_ready_for_an_unprocessed_image() -> None:
 
     with pytest.raises(ImageNotReadyError):
         await service.explain(image_id=image.id, question="Q", requesting_user=owner)
+
+
+async def test_highlight_locates_the_concept_the_question_names() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    segmenter = FakeSegmenter()
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=segmenter
+    )
+
+    result = await service.highlight(
+        image_id=image.id, question="Is there any vegetation?", requesting_user=owner
+    )
+
+    assert segmenter.requested == [(HighlightConcept.VEGETATION,)]
+    assert [layer.concept for layer in result.layers] == ["vegetation"]
+
+
+async def test_highlight_locates_both_things_in_a_comparison_question() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    segmenter = FakeSegmenter()
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=segmenter
+    )
+
+    result = await service.highlight(
+        image_id=image.id,
+        question="Are there more roads than residential buildings?",
+        requesting_user=owner,
+    )
+
+    assert segmenter.requested == [(HighlightConcept.ROADS, HighlightConcept.BUILDINGS)]
+    assert [layer.concept for layer in result.layers] == ["roads", "buildings"]
+
+
+async def test_highlight_passes_the_images_location_to_the_segmenter() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    bounds = (72.5, 23.0, 72.6, 23.1)
+    image.metadata = ImageMetadata(
+        width_px=256, height_px=256, band_count=3, dtype="uint8", bounds_wgs84=bounds
+    )
+    segmenter = FakeSegmenter()
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=segmenter
+    )
+
+    await service.highlight(image_id=image.id, question="Is there a road?", requesting_user=owner)
+
+    assert segmenter.bounds_seen == [bounds]
+
+
+async def test_highlight_without_a_location_passes_none() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    segmenter = FakeSegmenter()
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=segmenter
+    )
+
+    await service.highlight(image_id=image.id, question="Is there a road?", requesting_user=owner)
+
+    assert segmenter.bounds_seen == [None]
+
+
+async def test_highlight_says_when_size_and_shape_words_were_not_used() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=FakeSegmenter()
+    )
+
+    result = await service.highlight(
+        image_id=image.id, question="Is there a large circular water area?", requesting_user=owner
+    )
+
+    assert result.caveat is not None
+    assert '"large"' in result.caveat
+    assert '"circular"' in result.caveat
+
+
+async def test_highlight_has_no_caveat_when_nothing_was_ignored() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=FakeSegmenter()
+    )
+
+    result = await service.highlight(
+        image_id=image.id, question="Is there a water area?", requesting_user=owner
+    )
+
+    assert result.caveat is None
+
+
+async def test_highlight_refuses_a_question_naming_nothing_it_can_highlight() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    segmenter = FakeSegmenter()
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=segmenter
+    )
+
+    with pytest.raises(NothingToHighlightError):
+        await service.highlight(
+            image_id=image.id, question="Is it a rural or an urban area?", requesting_user=owner
+        )
+    assert segmenter.requested == []
+
+
+async def test_highlight_is_unavailable_when_segmentation_is_disabled() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    service = _build_service(image=image, model=FakeVqaModel(loaded=frozenset()))
+
+    with pytest.raises(ModelUnavailableError):
+        await service.highlight(
+            image_id=image.id, question="Is there water?", requesting_user=owner
+        )
+
+
+async def test_highlight_raises_not_found_for_someone_elses_image() -> None:
+    owner = _owner()
+    stranger = User(email="s3@geovisiongpt.io", full_name="S3", password_hash="h", id=uuid4())
+    image = _ready_image(owner.id)
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=FakeSegmenter()
+    )
+
+    with pytest.raises(NotFoundError):
+        await service.highlight(
+            image_id=image.id, question="Is there water?", requesting_user=stranger
+        )
+
+
+async def test_highlight_raises_not_ready_for_an_unprocessed_image() -> None:
+    owner = _owner()
+    image = _ready_image(owner.id)
+    image.status = ImageStatus.PROCESSING
+    service = _build_service(
+        image=image, model=FakeVqaModel(loaded=frozenset()), segmenter=FakeSegmenter()
+    )
+
+    with pytest.raises(ImageNotReadyError):
+        await service.highlight(
+            image_id=image.id, question="Is there water?", requesting_user=owner
+        )
 
 
 def _answer(fusion: FusionType, text: str, confidence: float) -> VqaAnswer:

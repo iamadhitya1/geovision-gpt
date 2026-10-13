@@ -65,6 +65,8 @@ export interface VqaAnswer {
   answer: string;
   confidence: number;
   alternatives: AnswerAlternative[];
+  /** A plain-English caveat for this answer, e.g. why a count is given as a range. */
+  note?: string | null;
 }
 
 export interface VqaQuery {
@@ -73,6 +75,10 @@ export interface VqaQuery {
   question: string;
   answers: VqaAnswer[];
   created_at: string;
+  /** What in the question can be highlighted on the image: one thing, two for a comparison. */
+  highlight_targets?: string[];
+  /** A "no" to a presence/count question means nothing to point at; to a comparison it doesn't. */
+  highlight_kind?: "presence" | "count" | "comparison";
 }
 
 export interface Page<T> {
@@ -80,6 +86,26 @@ export interface Page<T> {
   total: number;
   offset: number;
   limit: number;
+}
+
+/** One thing a question named, and how it was found. `method` says which technique (a colour
+ * index, a zero-shot segmenter, or OpenStreetMap map data — never the trained VQA model, which
+ * can't locate anything) and `caveat` says how far to trust it. */
+export interface HighlightLayer {
+  concept: string;
+  label: string;
+  color: string; // "#rrggbb", the colour it is outlined in on the overlay
+  coverage: number; // 0-1, fraction of the image it covers
+  method: string;
+  caveat?: string | null;
+}
+
+/** Where the thing(s) a question names appear in the image: one overlay PNG with everything
+ * else dimmed and each layer outlined in its own colour. */
+export interface ConceptHighlight {
+  layers: HighlightLayer[];
+  overlay_png_base64: string; // transparent PNG, same shape as the image
+  caveat?: string | null; // a note about the whole highlight, e.g. size/shape words ignored
 }
 
 export interface AttentionHeatmap {

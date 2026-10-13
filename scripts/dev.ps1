@@ -69,7 +69,9 @@ switch ($Task) {
         # No `alembic upgrade` here on purpose: the default SQLite profile creates any missing
         # tables itself at startup, and alembic refuses a database it didn't create ("table
         # users already exists"). Migrations are for the PostgreSQL profile.
-        # Child windows inherit GVG_SECRET_KEY from this session.
+        # Child windows inherit GVG_SECRET_KEY from this session. Warm the segmentation model up
+        # in the background so the first "highlight" click doesn't pause for several seconds.
+        $env:GVG_SEGMENTATION_WARM_UP = 'true'
         Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Backend'; & '$Python' -m uvicorn app.main:app --port 8000"
         Start-Process powershell -ArgumentList '-NoExit', '-Command', "Set-Location '$Frontend'; npm run build; npm run start"
         Write-Host "Backend on :8000, frontend building then serving on :3000 (about 30s)." -ForegroundColor Green

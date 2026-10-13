@@ -31,7 +31,8 @@ export default function MapPage() {
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">Map</h1>
           <p className="mt-1 text-sm text-muted">
-            Where your georeferenced scenes sit. Click a footprint to open it.
+            Browse anywhere, pick a place, and ask the models about it. Your own georeferenced
+            scenes show up as footprints.
           </p>
         </div>
         {images && (
@@ -48,14 +49,7 @@ export default function MapPage() {
         </p>
       )}
 
-      {images && located === 0 && (
-        <p className="rounded-sm border border-dashed border-line p-6 text-sm text-muted">
-          None of your images carry coordinates yet. GeoTIFFs with an embedded coordinate system show
-          up here automatically; plain PNG/JPEG files can&apos;t be placed on a map.
-        </p>
-      )}
-
-      {images && located > 0 && <MapView images={images} />}
+      {images && <MapView images={images} />}
     </div>
   );
 }

@@ -9,6 +9,7 @@ the domain :class:`~app.domain.interfaces.VqaModelPort` port. ``torch``/``transf
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from uuid import UUID
 
 from app.application.audit_service import AuditService
@@ -20,21 +21,44 @@ from app.application.dto import (
     VqaStatsRead,
 )
 from app.core.logging import get_logger
-from app.domain.entities import AttentionHeatmap, SatelliteImage, User, VqaAnswer, VqaQuery
+from app.domain.concepts import ignored_modifiers, resolve_targets
+from app.domain.entities import (
+    AttentionHeatmap,
+    ConceptHighlight,
+    SatelliteImage,
+    User,
+    VqaAnswer,
+    VqaQuery,
+)
 from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageStatus
-from app.domain.errors import ImageNotReadyError, NotFoundError
+from app.domain.errors import (
+    ImageNotReadyError,
+    ModelUnavailableError,
+    NotFoundError,
+    NothingToHighlightError,
+    UnsupportedQuestionError,
+)
 from app.domain.interfaces import (
     ImageRepository,
     ObjectStorage,
+    SegmentationPort,
     UnitOfWork,
     VqaModelPort,
     VqaQueryRepository,
 )
+from app.domain.question_guard import check_question
 
 logger = get_logger(__name__)
 
 _STATS_SAMPLE = 1000
 _RECENT_COUNT = 8
+
+
+def _with_note(answer: VqaAnswer, note: str | None) -> VqaAnswer:
+    """Put the "read as ..." note ahead of any note the model runner already attached."""
+    if note is None:
+        return answer
+    return replace(answer, note=f"{note} {answer.note}" if answer.note else note)
 
 
 class VqaService:
@@ -50,6 +74,7 @@ class VqaService:
         audit: AuditService,
         uow: UnitOfWork,
         default_top_k: int,
+        segmenter: SegmentationPort | None = None,
     ) -> None:
         self._images = images
         self._storage = storage
@@ -58,6 +83,7 @@ class VqaService:
         self._audit = audit
         self._uow = uow
         self._default_top_k = default_top_k
+        self._segmenter = segmenter
 
     def available_fusions(self) -> frozenset[FusionType]:
         return self._model.available_fusions()
@@ -85,12 +111,20 @@ class VqaService:
         if image.status is not ImageStatus.READY:
             raise ImageNotReadyError(image_id=str(image_id), status=image.status.value)
 
+        # The models only know RSVQA's question templates: reword a loosely-worded question to
+        # the nearest one, and turn away one of a different kind rather than guess confidently.
+        check = check_question(question)
+        if not check.supported:
+            raise UnsupportedQuestionError(check.reason, question=question)
+
         requested = frozenset(fusions) if fusions else self._model.available_fusions()
         image_bytes = await self._storage.get(image.storage_key)
 
         results = await asyncio.gather(
             *(
-                self._model.predict(image_bytes, question, fusion=fusion, top_k=self._default_top_k)
+                self._model.predict(
+                    image_bytes, check.text, fusion=fusion, top_k=self._default_top_k
+                )
                 for fusion in requested
             ),
             return_exceptions=True,
@@ -108,7 +142,7 @@ class VqaService:
                 )
                 failures.append(fusion.value)
             else:
-                answers.append(result)
+                answers.append(_with_note(result, check.note))
 
         query = VqaQuery(
             image_id=image_id,
@@ -152,7 +186,43 @@ class VqaService:
             raise ImageNotReadyError(image_id=str(image_id), status=image.status.value)
 
         image_bytes = await self._storage.get(image.storage_key)
-        return await self._model.explain(image_bytes, question)
+        check = check_question(question)
+        return await self._model.explain(image_bytes, check.text if check.supported else question)
+
+    async def highlight(
+        self, *, image_id: UUID, question: str, requesting_user: User
+    ) -> ConceptHighlight:
+        """Where the thing(s) the question is about appear in the image.
+
+        Not persisted, like :meth:`explain`: it's a view onto an existing answer. Whether a
+        thing is actually *present* is the VQA model's call (the client only offers the
+        highlight when the answer isn't "no"/"none") — this step only locates it. Comparison
+        questions name two things, and both are highlighted, each in its own colour.
+        """
+        concepts = resolve_targets(question)
+        if not concepts:
+            raise NothingToHighlightError(question=question)
+        if self._segmenter is None:
+            raise ModelUnavailableError(
+                "Highlighting isn't enabled on this server.", feature="highlight"
+            )
+
+        image = await self._images.get_by_id(image_id)
+        if image is None or not self._can_access(image, requesting_user):
+            raise NotFoundError("Image not found.", image_id=str(image_id))
+        if image.status is not ImageStatus.READY:
+            raise ImageNotReadyError(image_id=str(image_id), status=image.status.value)
+
+        image_bytes = await self._storage.get(image.storage_key)
+        bounds = image.metadata.bounds_wgs84 if image.metadata is not None else None
+        result = await self._segmenter.highlight(image_bytes, concepts, bounds_wgs84=bounds)
+
+        ignored = ignored_modifiers(question)
+        if ignored:
+            words = ", ".join(f'"{w}"' for w in ignored)
+            note = f"The question's size/shape words ({words}) aren't taken into account."
+            result = replace(result, caveat=note)
+        return result
 
     async def list_for_image(
         self, image_id: UUID, requesting_user: User, *, offset: int = 0, limit: int = 50

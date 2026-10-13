@@ -2,13 +2,20 @@ import type { FusionType } from "./types";
 
 /**
  * Held-out test-set accuracy on RSVQA-LR (9,838 questions), from `ml/README.md`.
- * These are the "widened" (`gen_xcit` / `gen_xcit_xattn`) models the app actually serves —
- * trained on RSVQA-LR + RSVQA-HR with augmentation, not the original single-dataset models.
+ * These are the "widened" models — trained on RSVQA-LR + RSVQA-HR with augmentation, not the
+ * original single-dataset models — and each figure is the MEAN OF THREE TRAINING RUNS (seeds 0,
+ * 1 and 2: `gen_xcit`, `gen_xcit_s1`, `gen_xcit_s2` and the `gen_xcit_xattn…` equivalents),
+ * produced by `ml/scripts/aggregate_seeds.py`. A single run turned out to be misleading: the
+ * two fusions looked tied when only seed 0 had been trained. The app serves the seed-0 models.
  * Measured on RSVQA-LR's test split so this stays comparable to the original numbers; the
  * unseen-city (RSVQA-HR Philadelphia) and robustness results live only in `ml/README.md`.
  */
+export const SEEDS = 3;
+
 export interface FusionResult {
   overall: number;
+  /** Standard deviation of `overall` across the training runs, in points. */
+  overallSpread: number;
   average: number;
   byType: { rural_urban: number; presence: number; comp: number; count: number };
 }
@@ -16,17 +23,21 @@ export interface FusionResult {
 export const TEST_SET_SIZE = 9838;
 
 export const RESULTS: Record<FusionType, FusionResult | null> = {
-  // TAG=gen_xcit, job 4341 (trained) / job 4349 (evaluated), 2026-09-22/23.
+  // Mean of gen_xcit (seed 0), gen_xcit_s1, gen_xcit_s2; evaluated 2026-09-23, 10-05, 10-07.
   elementwise: {
-    overall: 72.02,
-    average: 73.65,
-    byType: { rural_urban: 88.0, presence: 89.0, comp: 89.8, count: 27.9 },
+    overall: 72.51,
+    overallSpread: 0.69,
+    average: 74.18,
+    byType: { rural_urban: 88.67, presence: 89.68, comp: 90.3, count: 28.1 },
   },
-  // TAG=gen_xcit_xattn, job 4365 (trained) / job 4366 (evaluated), 2026-09-23/24.
+  // Mean of gen_xcit_xattn (seed 0), gen_xcit_xattn_s1, gen_xcit_xattn_s2.
+  // Its average (69.6) is pulled down and made noisy by rural/urban, which has 100 test
+  // questions and swung between 54% and 89% from one run to the next.
   cross_attention: {
-    overall: 71.96,
-    average: 73.91,
-    byType: { rural_urban: 89.0, presence: 89.3, comp: 89.1, count: 28.3 },
+    overall: 71.15,
+    overallSpread: 0.77,
+    average: 69.59,
+    byType: { rural_urban: 73.67, presence: 88.38, comp: 88.44, count: 27.88 },
   },
 };
 
@@ -36,8 +47,28 @@ export const RESULTS: Record<FusionType, FusionResult | null> = {
 // between a model and this row is what the image actually contributes.
 export const QUESTION_ONLY: FusionResult = {
   overall: 70.42,
+  overallSpread: 0,
   average: 64.84,
   byType: { rural_urban: 56.0, presence: 88.3, comp: 87.1, count: 28.0 },
+};
+
+// Counting scored the way the RSVQA paper scores it: the answer is placed in one of five ranges
+// (0 / 1-10 / 11-100 / 101-1,000 / >1,000) instead of having to match an exact integer, which at
+// 10 m per pixel nobody can read reliably. The app answers count questions this way too. The models'
+// figures use the probability-per-range decoding (ml/scripts/count_bucket_eval.py);
+// "question only" is the no-image floor in the same ranges. n counts every test count question,
+// including ones whose exact answer is outside the 1,000-answer vocabulary (a range can still hold them).
+// Elementwise is the mean of 3 runs (68.1, 68.5, 67.6 — the seed-1 run predates the metric);
+// cross-attention the mean of 3 (61.7, 56.7, 57.4, spread 2.7). A separate ensemble check
+// (ml/scripts/ensemble_eval.py) scored seeds 0-2 on the in-vocabulary count questions:
+// 68.0, 67.9, 68.4 — consistent.
+export const COUNT_IN_RANGES = {
+  n: 2947,
+  elementwise: 68.1,
+  cross_attention: 58.6,
+  question_only: 57.9,
+  elementwise_runs: 3,
+  cross_attention_runs: 3,
 };
 
 // `n` is the number of test questions of that type. It matters when reading the gaps:
