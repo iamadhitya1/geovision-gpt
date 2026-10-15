@@ -1802,6 +1802,13 @@
           68.5, 67.6), and a separate re-scoring of seeds 0–2 gave 68.0, 67.9 and 68.4, so it's stable; the ~10-point gap between the fusions held on all three cross-attention
           runs. And my 68% isn't a like-for-like comparison with the paper's 67% — different models
           and training. Don't claim to have beaten it.</span></p>
+        <p class="a"><strong>"Did you try to make counting better?"</strong> Yes, once. I added a training
+          term that rewards putting probability in the right range, wrote down beforehand what would
+          count as a win, then trained and tested it. It did not win: 68.65% against 68.14% for the
+          same run without it (inside the 67.6–68.5 spread of the other runs), and the unseen-city score
+          fell from 77.2% to 75.6%. It was one run with one untuned setting, so it doesn't prove the idea
+          can't work, but it gave no real gain, so the app doesn't use it. Exact counting would need an
+          object detector, which is a different project.</p>
       </div>
 
       <div class="qa">

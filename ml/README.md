@@ -546,7 +546,7 @@ Scored on all 9,838 RSVQA-LR test questions that are in the answer vocabulary:
   optional "robust mode".
 - One test set (RSVQA-LR) and three runs: a small, plausible gain, not a tested one.
 
-## Counting-aware training (code ready, not yet run on the cluster) — 2026-10-13
+## Counting-aware training (run once on the cluster; no clear gain) — 2026-10-13/15
 
 Counting in ranges (above) was obtained **without retraining**, by decoding the model's output
 differently. The model itself was still trained only to name the exact integer. This is the
@@ -562,8 +562,8 @@ loss itself is unit-tested (`tests/test_count_loss.py`, nine tests: it is small 
 in the true range, an answer that is off by a few but in the right range costs nothing extra,
 non-count rows are ignored, and the gradient pushes mass toward the true range), and a CPU smoke
 run of the full trainer with the loss on completed (`train_generalist.py --smoke
---count-loss-weight 0.5`). **No result exists yet.** Whether it improves counting, and whether it
-costs accuracy on the other question types, is an open question this section does not answer.
+--count-loss-weight 0.5`). It was then run once on the cluster; the result is at the end of this
+section.
 
 To run it, one job at a time, on the cluster (copy the vocabulary first, as for every new tag;
 `w = 0.5` is an untuned first guess — one run per design, compared against the three-run means
@@ -582,6 +582,29 @@ comparable with the elementwise runs (68.1% in ranges, 61.8% by the usual argmax
 no-image floor 57.9%). The success criterion to decide in advance: counting in ranges clearly
 above the 68% band of the existing runs (they span 67.6 to 68.5) **and** overall, presence and
 comparison accuracy not lower than the existing runs by more than their run-to-run spread.
+
+### Result (tag `gen_xcit_cnt`, elementwise, `--count-loss-weight 0.5`, default seed, jobs 4579 and 4580)
+
+The criterion above was written before the run and is applied unchanged. **It was not met.**
+
+| | `gen_xcit_cnt` (loss on) | `gen_xcit` (same seed, loss off) | other elementwise runs (s1, s2, s3) |
+|---|---|---|---|
+| Counting in ranges, LR test | 68.65% | 68.14% | 67.6 to 68.5 (the three-run band) |
+| LR overall | 71.89 | 72.02 | 72.22 to 73.30 |
+| HR overall | 81.56 | 81.87 | 82.99 to 83.35 |
+| Philadelphia overall | 75.63 | 77.21 | 77.01 to 79.30 |
+| HR comparison | 86.6 | 87.7 | 89.6 to 90.0 |
+
+Counting in ranges is +0.5 over its same-seed baseline and ends 0.15 above the top of the old band,
+which is not "clearly above". Philadelphia (the unseen city) is 1.6 points below its same-seed
+baseline and below all four earlier elementwise runs; LR and HR overall are slightly below too,
+within ordinary run-to-run variation. This is one run at one untuned weight and one seed, so it does
+**not** show that the idea cannot work, and the Philadelphia drop cannot be pinned on the loss from a
+single run. What it does show is that this setting gave no counting gain worth its apparent cost.
+
+Outcome: the loss stays in the code, off by default; no model, table or app behaviour changed; no
+further weights were tried. (The raw evaluation file is git-ignored with the other checkpoints; the
+numbers above are copied from it.)
 
 ## Setup
 
