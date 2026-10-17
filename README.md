@@ -299,6 +299,10 @@ GeoPandas
 **Frontend** Next.js (App Router) · Tailwind · Leaflet
 **Ops** Docker · GitHub Actions · NGINX
 
+## Author
+
+Built by [M. Adhitya](https://iamadhitya.vercel.app) · [LinkedIn](https://www.linkedin.com/in/iamadhitya/) · [GitHub](https://github.com/iamadhitya1) · [Rewrite Labs](https://rewritelabs.vercel.app)
+
 ## Licence
 
 Academic project. Datasets retain their own licences (EarthVQA, BigEarthNet, EuroSAT,
