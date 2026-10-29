@@ -140,6 +140,13 @@ def parse_features(payload: dict[str, Any], concept: HighlightConcept) -> list[M
     return features
 
 
+OSM_METHOD = "OpenStreetMap map data for this location — not detected from the image"
+OSM_CAVEAT = (
+    "Drawn from map data at this scene's coordinates, so it can be newer or older than the "
+    "imagery, and anything nobody has mapped is missing. It is not something the model found."
+)
+
+
 class OverpassMapData:
     """Implements :class:`~app.domain.interfaces.MapDataPort`.
 
@@ -165,6 +172,11 @@ class OverpassMapData:
         self._cache: OrderedDict[tuple[str, tuple[float, ...]], list[MapFeature]] = OrderedDict()
         self._lock = asyncio.Lock()
         self._gate = asyncio.Semaphore(1)
+
+    def describe(
+        self, concept: HighlightConcept, bounds_wgs84: tuple[float, float, float, float]
+    ) -> tuple[str, str]:
+        return OSM_METHOD, OSM_CAVEAT
 
     async def fetch(
         self, concept: HighlightConcept, bounds_wgs84: tuple[float, float, float, float]

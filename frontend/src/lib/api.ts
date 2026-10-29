@@ -1,4 +1,7 @@
 import type {
+  AreaAnalysis,
+  AreaCapabilities,
+  AreaRequest,
   AttentionHeatmap,
   ConceptHighlight,
   AuthResponse,
@@ -181,6 +184,13 @@ export const api = {
    * nothing highlightable, 503 if highlighting or its model isn't available. */
   highlightConcept: (imageId: string, question: string) =>
     request<ConceptHighlight>(`/images/${imageId}/highlight`, json("POST", { question })),
+
+  /** Which imagery sources and area sizes the server offers for a sliding-window analysis. */
+  areaCapabilities: () => request<AreaCapabilities>("/area/capabilities"),
+
+  /** Ask a question about a square area bigger than one image: the models' 256 px window is
+   * slid across it. Takes a while for a large area, and 502 if the imagery can't be fetched. */
+  analyseArea: (body: AreaRequest) => request<AreaAnalysis>("/area/analyse", json("POST", body)),
 
   /** The thumbnail endpoint needs the bearer header, which an <img src> can't send. */
   thumbnailBlob: async (id: string): Promise<Blob> => {

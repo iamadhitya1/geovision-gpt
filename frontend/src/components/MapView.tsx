@@ -15,8 +15,15 @@ import {
   useMap,
   useMapEvents,
 } from "react-leaflet";
+import { AreaCells, AreaPanel } from "@/components/AreaPanel";
 import { api, ApiError } from "@/lib/api";
-import type { SatelliteImage } from "@/lib/types";
+import type {
+  AreaAnalysis,
+  AreaCapabilities,
+  FusionType,
+  ImagerySource,
+  SatelliteImage,
+} from "@/lib/types";
 
 type Bounds = [[number, number], [number, number]]; // [[south, west], [north, east]]
 
@@ -58,8 +65,8 @@ function toBounds(image: SatelliteImage): Bounds | null {
 }
 
 /** The square a capture would cover if taken now, as map bounds around the centre. */
-function sceneBounds(lat: number, lng: number): Bounds {
-  const half = SCENE_SIDE_M / 2;
+function sceneBounds(lat: number, lng: number, sideM: number = SCENE_SIDE_M): Bounds {
+  const half = sideM / 2;
   const dLat = half / 111_320;
   const dLng = half / (111_320 * Math.cos((lat * Math.PI) / 180));
   return [
@@ -105,6 +112,18 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
   const [capturing, setCapturing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // "Larger area" mode: slide the models' fixed window across a bigger square (sliding window).
+  const [mode, setMode] = useState<"place" | "area">("place");
+  const [areaCaps, setAreaCaps] = useState<AreaCapabilities | null>(null);
+  const [areaSizeKm, setAreaSizeKm] = useState(10);
+  const [areaQuestion, setAreaQuestion] = useState("Is there a water area?");
+  const [areaSource, setAreaSource] = useState<ImagerySource | "auto">("auto");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [areaBusy, setAreaBusy] = useState(false);
+  const [areaResult, setAreaResult] = useState<AreaAnalysis | null>(null);
+  const [areaFusion, setAreaFusion] = useState<FusionType>("elementwise");
+
   const located = useMemo(
     () =>
       images.flatMap((image) => {
@@ -141,8 +160,19 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
     };
   }, [located]);
 
+  // What the server can do for an area analysis (sources, largest size). Optional: if this fails
+  // the panel still works with the defaults and the server explains any refusal.
+  useEffect(() => {
+    api
+      .areaCapabilities()
+      .then(setAreaCaps)
+      .catch(() => undefined);
+  }, []);
+
   const base = BASEMAPS[basemap];
   const canAnalyse = view !== null && view.zoom >= MIN_ANALYSE_ZOOM && !capturing;
+  const canAnalyseArea =
+    view !== null && view.zoom >= MIN_ANALYSE_ZOOM && !areaBusy && areaQuestion.trim().length > 0;
 
   // OpenStreetMap's Nominatim geocoder: one request per submitted search (never per keystroke),
   // which is what its usage policy asks for.
@@ -183,6 +213,40 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
     }
   }
 
+  async function analyseArea() {
+    if (!view || !canAnalyseArea) return;
+    setAreaBusy(true);
+    setNotice(null);
+    setAreaResult(null);
+    try {
+      const result = await api.analyseArea({
+        question: areaQuestion.trim(),
+        latitude: view.lat,
+        longitude: view.lng,
+        size_km: areaSizeKm,
+        ...(areaSource !== "auto" ? { source: areaSource } : {}),
+        ...(dateFrom ? { date_from: dateFrom } : {}),
+        ...(dateTo ? { date_to: dateTo } : {}),
+      });
+      setAreaResult(result);
+      if (!result.results.some((r) => r.fusion === areaFusion)) setAreaFusion(result.results[0].fusion);
+      const [west, south, east, north] = result.bounds_wgs84;
+      // Fit the area into the part of the map the result panel doesn't cover.
+      const panel = map ? Math.min(360, map.getSize().x * 0.45) : 0;
+      map?.fitBounds(
+        [
+          [south, west],
+          [north, east],
+        ],
+        { paddingTopLeft: [40, 60], paddingBottomRight: [panel + 40, 40] },
+      );
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : "Couldn't analyse that area. Try again.");
+    } finally {
+      setAreaBusy(false);
+    }
+  }
+
   return (
     <div className="plate relative h-[calc(100vh-11rem)] min-h-[28rem]">
       <MapContainer
@@ -208,11 +272,12 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
         <FitToImages bounds={allBounds} />
         {view && view.zoom >= MIN_ANALYSE_ZOOM && (
           <Rectangle
-            bounds={sceneBounds(view.lat, view.lng)}
+            bounds={sceneBounds(view.lat, view.lng, mode === "area" ? areaSizeKm * 1000 : SCENE_SIDE_M)}
             pathOptions={{ color: "#ffffff", weight: 1.5, dashArray: "6 6", fillOpacity: 0 }}
             interactive={false}
           />
         )}
+        {mode === "area" && areaResult && <AreaCells result={areaResult} fusion={areaFusion} />}
         {located.map(({ image, bounds }) => {
           const active = image.id === selectedId;
           return (
@@ -254,28 +319,79 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
         </button>
       </form>
 
-      <div className="absolute bottom-4 right-4 z-[1000] flex max-w-xs flex-col items-end gap-2">
+      <div className="absolute bottom-4 right-4 z-[1000] flex max-w-[calc(100%-2rem)] flex-col items-end gap-2">
         {notice && (
-          <p role="alert" className="rounded-sm border border-danger/40 bg-ink/95 px-3 py-2 text-xs text-danger">
+          <p role="alert" className="max-w-xs rounded-sm border border-danger/40 bg-ink/95 px-3 py-2 text-xs text-danger">
             {notice}
           </p>
         )}
-        <button
-          type="button"
-          onClick={() => void analyse()}
-          disabled={!canAnalyse}
-          className="rounded-sm bg-elementwise px-4 py-2.5 text-sm font-semibold text-ink shadow-lg transition hover:brightness-110 disabled:opacity-50"
-        >
-          {capturing
-            ? "Fetching the scene…"
-            : view && view.zoom < MIN_ANALYSE_ZOOM
-              ? "Zoom in to pick a place"
-              : "Analyse this place"}
-        </button>
-        <p className="rounded-sm bg-ink/80 px-2 py-1 text-right font-mono text-[10px] leading-snug text-muted backdrop-blur">
-          Analyses the dashed 2.5 km square, from Sentinel-2 imagery at ~10 m per pixel — the scale
-          the models were trained on.
-        </p>
+        {mode === "area" ? (
+          <AreaPanel
+            capabilities={areaCaps}
+            sizeKm={areaSizeKm}
+            onSizeKm={(km) => {
+              setAreaSizeKm(km);
+              setAreaResult(null);
+            }}
+            question={areaQuestion}
+            onQuestion={setAreaQuestion}
+            source={areaSource}
+            onSource={setAreaSource}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDates={(from, to) => {
+              setDateFrom(from);
+              setDateTo(to);
+            }}
+            busy={areaBusy}
+            canRun={canAnalyseArea}
+            onRun={() => void analyseArea()}
+            result={areaResult}
+            fusion={areaFusion}
+            onFusion={setAreaFusion}
+          />
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => void analyse()}
+              disabled={!canAnalyse}
+              className="rounded-sm bg-elementwise px-4 py-2.5 text-sm font-semibold text-ink shadow-lg transition hover:brightness-110 disabled:opacity-50"
+            >
+              {capturing
+                ? "Fetching the scene…"
+                : view && view.zoom < MIN_ANALYSE_ZOOM
+                  ? "Zoom in to pick a place"
+                  : "Analyse this place"}
+            </button>
+            <p className="max-w-xs rounded-sm bg-ink/80 px-2 py-1 text-right font-mono text-[10px] leading-snug text-muted backdrop-blur">
+              Analyses the dashed 2.5 km square, from Sentinel-2 imagery at ~10 m per pixel — the scale
+              the models were trained on.
+            </p>
+          </>
+        )}
+        <div className="flex overflow-hidden rounded-sm border border-line bg-ink/90 text-xs backdrop-blur">
+          {(
+            [
+              ["place", "This place (2.5 km)"],
+              ["area", "Larger area"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setMode(key);
+                setNotice(null);
+              }}
+              className={`px-3 py-1.5 transition ${
+                mode === key ? "bg-raised text-text" : "text-muted hover:text-text"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="absolute right-3 top-3 z-[1000] flex overflow-hidden rounded-sm border border-line bg-ink/90 backdrop-blur">

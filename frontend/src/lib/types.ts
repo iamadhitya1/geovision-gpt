@@ -124,3 +124,57 @@ export interface VqaStats {
   agreement: { compared: number; agreed: number };
   recent: VqaQuery[];
 }
+
+export type ImagerySource = "earth_engine" | "sentinel_cloudless";
+
+/** What the sliding-window area analysis can do on this server right now. */
+export interface AreaCapabilities {
+  sources: ImagerySource[];
+  max_size_km: number;
+  min_size_km: number;
+  window_km: number;
+  fusions: FusionType[];
+}
+
+export interface AreaCell {
+  row: number;
+  col: number;
+  bounds_wgs84: [number, number, number, number]; // west, south, east, north
+  answer: string;
+  agreement: number; // share of the windows over this cell that gave `answer`
+  windows: number;
+  mean_confidence: number;
+}
+
+/** One model's view of the whole area: the share of it that got each answer, plus a coarse grid. */
+export interface FusionAreaResult {
+  fusion: FusionType;
+  shares: { answer: string; share: number }[];
+  cells: AreaCell[];
+  failed_windows: number;
+}
+
+export interface AreaAnalysis {
+  question: string;
+  question_used: string;
+  note: string | null;
+  source: ImagerySource;
+  captured: string | null; // how recent the imagery is, in words
+  bounds_wgs84: [number, number, number, number];
+  width_px: number;
+  height_px: number;
+  window_px: number;
+  stride_px: number;
+  window_count: number;
+  results: FusionAreaResult[];
+}
+
+export interface AreaRequest {
+  question: string;
+  latitude: number;
+  longitude: number;
+  size_km: number;
+  source?: ImagerySource;
+  date_from?: string; // YYYY-MM-DD
+  date_to?: string;
+}

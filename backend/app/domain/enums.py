@@ -72,6 +72,19 @@ class FusionType(StrEnum):
     CROSS_ATTENTION = "cross_attention"
 
 
+class ImagerySource(StrEnum):
+    """Where the pixels for an area analysis come from.
+
+    ``EARTH_ENGINE`` is Google Earth Engine (the latest clear Sentinel-2 scenes, any date range),
+    free for non-commercial research. ``SENTINEL_CLOUDLESS`` is the EOX cloud-free mosaic: no
+    account needed, but a fixed 2020 composite, not recent imagery. Google's own basemap
+    pictures are deliberately not a source: its terms restrict using them for machine learning.
+    """
+
+    EARTH_ENGINE = "earth_engine"
+    SENTINEL_CLOUDLESS = "sentinel_cloudless"
+
+
 class ImageStatus(StrEnum):
     """Processing lifecycle of an uploaded image.
 

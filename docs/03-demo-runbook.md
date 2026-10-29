@@ -121,6 +121,23 @@ random new one live. On dense city scenes the cross-attention model may call the
 "rural" while elementwise says "urban" — that disagreement is real, and the honest thing is to
 point it out.
 
+**4b. A larger area, with a sliding window (2 min).** On the Map page click **Larger area**
+(bottom right). Sir's question was "can it work on a map of any size, not just one fixed image?" The
+honest answer: the models read one 256 px picture at about 10 m per pixel (2.56 km), so an area
+bigger than that is covered by **sliding that window across it**, half a window at a time, asking
+every window the same question, and combining the answers. Search a place (Ahmedabad), pick **10 ×
+10 km** and the question **"Is it a rural or an urban area?"**, press **Analyse area**.
+**Don't use "Is there a water area?" in the larger-area demo.** On 29 Oct, scored window by window against OpenStreetMap water (river, canals, ponds), both models said "yes" in **all 49** windows at Ahmedabad (OpenStreetMap shows water in 46 of them, so 94% right), in all 49 in rural Gujarat (water in only 26, so 53% right) and in all 49 near Amsterdam (all 49 have water): across 147 windows neither model once said "no". So the water answer there reflects how common water is, not an ability to tell. OpenStreetMap is an imperfect reference in rural India (unmapped ponds), so 53% is not exact either. It takes about 25 s for
+49 windows × 2 models. A grid appears: each cell coloured by what the windows over it answered
+(blue no / orange yes, fainter where windows disagreed), with the share of the area per model. If
+Google Earth Engine is set up the imagery line says so, with the newest scene's date ("latest
+available", never "live": Sentinel-2 passes a place every ~5 days); otherwise it uses the fixed 2020
+mosaic and says that. Say plainly: "This is a coarse map of what the windows answered, not an
+outline. I measured that Earth Engine pictures give the models the same accuracy as the dataset's
+own on 40 test images in the Netherlands; I have **not** measured large stitched areas against
+labels." Don't claim it finds objects. Expect the two models to disagree on some cells; that is
+real. Needs internet; run it once beforehand (the first call after start is slower).
+
 **5. Dashboard (1 min).** Model accuracy: elementwise vs. cross-attention fusion on the
 9,838-question held-out test set, broken down by question type; then the live usage figures.
 

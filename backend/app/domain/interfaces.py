@@ -11,6 +11,7 @@ root) is the only place that names a concrete class.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
@@ -27,7 +28,14 @@ from app.domain.entities import (
     VqaAnswer,
     VqaQuery,
 )
-from app.domain.enums import FusionType, ImageFormat, ImageStatus, Role, TokenType
+from app.domain.enums import (
+    FusionType,
+    ImageFormat,
+    ImagerySource,
+    ImageStatus,
+    Role,
+    TokenType,
+)
 
 
 @runtime_checkable
@@ -211,6 +219,53 @@ class ImageryProvider(Protocol):
 
 
 @runtime_checkable
+class AreaScenePort(Protocol):
+    """A satellite picture of an area bigger than one model input, at the models' ~10 m scale.
+
+    Holds the pixels itself and hands them out one window at a time, so the application layer
+    never needs an imaging library: it only asks for "the 256 px square starting here".
+    """
+
+    width_px: int
+    height_px: int
+    bounds_wgs84: tuple[float, float, float, float]  # (west, south, east, north)
+    source: ImagerySource
+    captured: str | None  # a plain-English note on how recent the imagery is, if known
+
+    def crop_png(self, x: int, y: int, size: int) -> bytes:
+        """PNG bytes of the ``size`` x ``size`` px square whose top-left corner is (x, y)."""
+        ...
+
+    def box_wgs84(
+        self, left: int, top: int, right: int, bottom: int
+    ) -> tuple[float, float, float, float]:
+        """The geographic (west, south, east, north) of a pixel box, so results can be drawn on
+        the map exactly where they belong."""
+        ...
+
+
+@runtime_checkable
+class AreaImageryProvider(Protocol):
+    """Fetches a satellite picture of a square area, shaped for the sliding-window analysis."""
+
+    async def fetch_area(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        size_px: int,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> AreaScenePort:
+        """A ``size_px`` x ``size_px`` picture centred on the point, about 10 m per pixel.
+        ``date_from``/``date_to`` ask for imagery from that period when the source supports it
+        (a source with a single fixed composite ignores them and says so in ``captured``).
+        Raises :class:`~app.domain.errors.ImageryUnavailableError` if the imagery service can't
+        be reached or has nothing usable there."""
+        ...
+
+
+@runtime_checkable
 class MapDataPort(Protocol):
     """Looks up map features (roads, buildings, forests…) for a stretch of the Earth.
 
@@ -224,6 +279,13 @@ class MapDataPort(Protocol):
     ) -> list[MapFeature]:
         """``bounds_wgs84`` is (west, south, east, north). Raises
         :class:`~app.domain.errors.ImageryUnavailableError` if the service can't be reached."""
+        ...
+
+    def describe(
+        self, concept: HighlightConcept, bounds_wgs84: tuple[float, float, float, float]
+    ) -> tuple[str, str]:
+        """``(method, caveat)``: what a highlight drawn from this source must say about where it
+        came from and how far to trust it. A highlight never names a source it did not use."""
         ...
 
 

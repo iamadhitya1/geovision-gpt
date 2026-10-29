@@ -51,3 +51,6 @@ ml/outputs/
 Thumbs.db
 .idea/
 .vscode/
+
+# Gujarat tiles built from Earth Engine (large, regenerable)
+ml/dataset/gujarat/

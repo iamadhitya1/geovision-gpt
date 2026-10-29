@@ -19,6 +19,8 @@ from app.domain.concepts import HighlightConcept
 from app.domain.entities import MapFeature
 from app.domain.errors import ImageryUnavailableError
 from app.infrastructure.imaging.osm_provider import (
+    OSM_CAVEAT,
+    OSM_METHOD,
     OverpassMapData,
     build_query,
     parse_features,
@@ -193,6 +195,9 @@ class FakeMapData:
         self._features = features or {}
         self.asked: list[HighlightConcept] = []
         self.fail = False
+
+    def describe(self, concept, bounds_wgs84):
+        return OSM_METHOD, OSM_CAVEAT
 
     async def fetch(self, concept, bounds_wgs84):
         self.asked.append(concept)

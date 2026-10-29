@@ -8,12 +8,13 @@ that class of leak impossible rather than merely discouraged.
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.domain.area import AreaAnalysis
 from app.domain.concepts import question_kind, resolve_targets
 from app.domain.entities import (
     AnswerAlternative,
@@ -28,7 +29,15 @@ from app.domain.entities import (
     VqaAnswer,
     VqaQuery,
 )
-from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageFormat, ImageStatus, Role
+from app.domain.enums import (
+    AuditAction,
+    AuditOutcome,
+    FusionType,
+    ImageFormat,
+    ImagerySource,
+    ImageStatus,
+    Role,
+)
 
 T = TypeVar("T")
 
@@ -619,3 +628,124 @@ class RequestContext(BaseModel):
 
     ip_address: str | None = None
     user_agent: str | None = None
+
+
+# --- Sliding-window area analysis --------------------------------------------------------
+
+
+class AreaAnalysisRequest(BaseModel):
+    """A question about a square area centred on a point.
+
+    ``size_km`` is the side of the square. The models read 2.56 km at a time, so anything
+    larger is covered by sliding that window across it. ``source`` defaults to the best one
+    available; the dates apply to Google Earth Engine only (the EOX mosaic is one fixed 2020
+    composite).
+    """
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        json_schema_extra={
+            "example": {
+                "question": "Is there a water area?",
+                "latitude": 23.0225,
+                "longitude": 72.5714,
+                "size_km": 10,
+            }
+        },
+    )
+
+    question: Annotated[str, Field(min_length=1, max_length=500)]
+    latitude: Annotated[float, Field(ge=-80.0, le=80.0)]
+    longitude: Annotated[float, Field(ge=-180.0, le=180.0)]
+    size_km: Annotated[float, Field(gt=0, le=100)]
+    source: ImagerySource | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    fusions: list[FusionType] | None = None
+
+
+class AreaCellRead(BaseModel):
+    row: int
+    col: int
+    bounds_wgs84: tuple[float, float, float, float]  # west, south, east, north
+    answer: str
+    agreement: float  # share of the windows over this cell that gave `answer`
+    windows: int
+    mean_confidence: float
+
+
+class AnswerShareRead(BaseModel):
+    answer: str
+    share: float  # share of the area (0-1)
+
+
+class FusionAreaRead(BaseModel):
+    fusion: FusionType
+    shares: list[AnswerShareRead]
+    cells: list[AreaCellRead]
+    failed_windows: int
+
+
+class AreaAnalysisRead(BaseModel):
+    """Per model variant: the share of the area that got each answer, and a coarse grid of
+    cells (each half a window wide) for drawing on the map. A rough picture of where windows
+    answered what, not an outline of anything."""
+
+    question: str
+    question_used: str
+    note: str | None
+    source: ImagerySource
+    captured: str | None
+    bounds_wgs84: tuple[float, float, float, float]
+    width_px: int
+    height_px: int
+    window_px: int
+    stride_px: int
+    window_count: int
+    results: list[FusionAreaRead]
+
+    @classmethod
+    def from_domain(cls, analysis: AreaAnalysis) -> AreaAnalysisRead:
+        return cls(
+            question=analysis.question,
+            question_used=analysis.question_used,
+            note=analysis.note,
+            source=analysis.source,
+            captured=analysis.captured,
+            bounds_wgs84=analysis.bounds_wgs84,
+            width_px=analysis.width_px,
+            height_px=analysis.height_px,
+            window_px=analysis.window_px,
+            stride_px=analysis.stride_px,
+            window_count=analysis.window_count,
+            results=[
+                FusionAreaRead(
+                    fusion=r.fusion,
+                    shares=[AnswerShareRead(answer=a, share=s) for a, s in r.share_by_answer],
+                    cells=[
+                        AreaCellRead(
+                            row=c.row,
+                            col=c.col,
+                            bounds_wgs84=c.bounds_wgs84,
+                            answer=c.answer,
+                            agreement=c.agreement,
+                            windows=c.windows,
+                            mean_confidence=c.mean_confidence,
+                        )
+                        for c in r.cells
+                    ],
+                    failed_windows=r.failed_windows,
+                )
+                for r in analysis.results
+            ],
+        )
+
+
+class AreaCapabilitiesRead(BaseModel):
+    """What the area analysis can do on this server right now."""
+
+    sources: list[ImagerySource]
+    max_size_km: float
+    min_size_km: float
+    window_km: float
+    fusions: list[FusionType]

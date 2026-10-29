@@ -125,6 +125,17 @@ class Settings(BaseSettings):
     )
     imagery_user_agent: str = "GeoVisionGPT/0.1 (student research project)"
 
+    # --- Sliding-window area analysis ---------------------------------------------
+    # "Analyse an area" slides the models' fixed 256 px window across a bigger picture (see
+    # app/domain/area.py). The limits keep one request to a few minutes of CPU at most.
+    area_max_size_km: float = Field(default=20.0, ge=2.56, le=60.0)
+    area_max_windows: int = Field(default=256, ge=1, le=2000)
+    # Google Earth Engine: the route Google offers researchers to its satellite data (free for
+    # non-commercial research; register and create a Cloud project first). Empty = off, and the
+    # app uses the fixed 2020 EOX mosaic. See app/infrastructure/imaging/earth_engine_provider.py.
+    earth_engine_project: str = ""
+    earth_engine_window_days: int = Field(default=90, ge=1, le=730)
+
     # --- Answer highlighting ----------------------------------------------------
     # "Show where" on an answer. Vegetation uses a colour index and needs no download; the
     # other concepts use this pretrained text-prompted segmenter (~577 MB, fetched from

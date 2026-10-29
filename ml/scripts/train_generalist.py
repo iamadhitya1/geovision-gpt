@@ -10,6 +10,11 @@ baseline stays exactly reproducible; this script reuses its collate/evaluate cod
 * a time budget and resume: the cluster kills jobs after 4 hours, so the script stops itself
   cleanly before that, saves its full state, and picks up from the same step when run again
 * optional bfloat16 mixed precision on the GPU
+* a third dataset, ``guj``: labelled Gujarat tiles (``dataset/gujarat_dataset.py``), repeated
+  ``--guj-repeat`` times per epoch so they are not drowned out by the much larger LR and HR sets,
+  with the best epoch chosen on the Gujarat *validation districts* (``--select-on guj``) and the
+  LR and HR validation scores still logged, so forgetting shows up instead of being hidden
+* ``--init-from``: start from a trained checkpoint (fine-tuning) instead of from scratch
 
     python scripts/train_generalist.py --tag gen_xcit --datasets lr+hr --epochs 8 --amp
     (run it again with the same arguments to resume; exit code 3 means "not finished yet")
@@ -35,6 +40,7 @@ from torch.utils.data import DataLoader
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dataset.augment import TrainAugmentation
+from dataset.gujarat_dataset import load_gujarat_examples
 from dataset.rsvqa_lr_dataset import AnswerVocabulary, VqaExample, load_split_examples
 from dataset.vqa_examples_dataset import VqaExamplesDataset, in_vocabulary
 from models.count_loss import build_range_table, range_mass_loss
@@ -86,6 +92,8 @@ def epoch_plan(
     hr_per_epoch: int,
     epoch: int,
     seed: int,
+    guj_train: list[VqaExample] | None = None,
+    guj_repeat: int = 1,
 ) -> list[VqaExample]:
     """The examples of one epoch, in a deterministic order for that (seed, epoch) — which is
     what lets a resumed run skip exactly the steps it already did."""
@@ -93,6 +101,8 @@ def epoch_plan(
     if hr_train:
         chooser = random.Random(seed * 1000 + epoch)
         examples += chooser.sample(hr_train, min(hr_per_epoch, len(hr_train)))
+    if guj_train:
+        examples += list(guj_train) * max(1, guj_repeat)
     random.Random(seed * 1000 + epoch + 500).shuffle(examples)
     return examples
 
@@ -100,7 +110,27 @@ def epoch_plan(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag", required=True, help="prefix for this run's checkpoint files")
-    parser.add_argument("--datasets", choices=["lr", "lr+hr"], default="lr+hr")
+    parser.add_argument(
+        "--datasets", choices=["lr", "lr+hr", "lr+guj", "lr+hr+guj"], default="lr+hr"
+    )
+    parser.add_argument(
+        "--guj-repeat",
+        type=int,
+        default=4,
+        help="times the Gujarat training examples are repeated each epoch",
+    )
+    parser.add_argument(
+        "--init-from",
+        type=Path,
+        default=None,
+        help="a trained checkpoint to start from (fine-tuning); ignored when resuming",
+    )
+    parser.add_argument(
+        "--select-on",
+        choices=["average", "guj"],
+        default="average",
+        help="what picks the best epoch: all datasets averaged, or Gujarat validation alone",
+    )
     parser.add_argument(
         "--image-encoder", choices=["xcit_nano", "deit_tiny", "mobilevit_s"], default="xcit_nano"
     )
@@ -139,8 +169,9 @@ def main() -> None:
     history_path = CHECKPOINT_DIR / f"{args.tag}_history.json"
 
     names = args.datasets.split("+")
-    train_pools = {n: load_examples(n, "train") for n in names}
-    val_pools = {n: load_examples(n, "val") for n in names}
+    plain = [n for n in names if n != "guj"]
+    train_pools = {n: load_examples(n, "train") for n in plain}
+    val_pools = {n: load_examples(n, "val") for n in plain}
 
     if vocab_path.exists():
         vocab = AnswerVocabulary.from_json(vocab_path)
@@ -150,6 +181,10 @@ def main() -> None:
         )
         vocab.to_json(vocab_path)
     logger.info("Answer vocabulary: %d classes (%s)", len(vocab), vocab_path.name)
+    if "guj" in names:
+        # Needs the vocabulary: a building count is trained as the nearest answer in its range.
+        train_pools["guj"] = load_gujarat_examples("train", vocab)
+        val_pools["guj"] = load_gujarat_examples("val", vocab)
 
     train_pools = {n: in_vocabulary(p, vocab) for n, p in train_pools.items()}
     val_pools = {n: in_vocabulary(p, vocab) for n, p in val_pools.items()}
@@ -165,12 +200,20 @@ def main() -> None:
 
     lr_train = train_pools["lr"]
     hr_train = train_pools.get("hr", [])
+    guj_train = train_pools.get("guj", [])
     logger.info(
         "Training pools: LR %d questions, HR %d (using %d per epoch)",
         len(lr_train),
         len(hr_train),
         min(args.hr_per_epoch, len(hr_train)),
     )
+    if guj_train:
+        logger.info(
+            "Gujarat: %d training questions x%d per epoch, %d validation questions",
+            len(guj_train),
+            args.guj_repeat,
+            len(val_pools["guj"]),
+        )
 
     encoder: ImageEncoderName = args.image_encoder
     tokenizer = build_tokenizer()
@@ -194,6 +237,12 @@ def main() -> None:
     )
 
     state = {"epoch": 0, "step": 0, "history": [], "best_score": -1.0, "minutes": 0.0}
+    if args.init_from is not None and not latest_path.exists():
+        start = torch.load(args.init_from, map_location=device, weights_only=False)
+        if start.get("fusion", args.fusion) != args.fusion:
+            raise SystemExit(f"--init-from is a {start['fusion']} model, not {args.fusion}")
+        model.load_state_dict(start["model_state_dict"])
+        logger.info("Fine-tuning from %s", args.init_from)
     if latest_path.exists():
         saved = torch.load(latest_path, map_location=device, weights_only=False)
         model.load_state_dict(saved["model_state_dict"])
@@ -239,7 +288,9 @@ def main() -> None:
 
     while state["epoch"] < args.epochs:
         epoch = state["epoch"]
-        examples = epoch_plan(lr_train, hr_train, args.hr_per_epoch, epoch, args.seed)
+        examples = epoch_plan(
+            lr_train, hr_train, args.hr_per_epoch, epoch, args.seed, guj_train, args.guj_repeat
+        )
         first_index = state["step"] * args.batch_size
         loader = DataLoader(
             VqaExamplesDataset(examples, vocab, augment),
@@ -308,7 +359,10 @@ def main() -> None:
 
         # ---- end of epoch: validate, record, checkpoint --------------------------------
         results = validate()
-        score = sum(r["average_accuracy"] for r in results.values()) / len(results)
+        if args.select_on == "guj":
+            score = results["guj"]["average_accuracy"]
+        else:
+            score = sum(r["average_accuracy"] for r in results.values()) / len(results)
         state["history"].append(
             {"epoch": epoch, "score": score, **{n: r for n, r in results.items()}}
         )

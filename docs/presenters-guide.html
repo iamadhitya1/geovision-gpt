@@ -1812,6 +1812,59 @@
       </div>
 
       <div class="qa">
+        <p class="q">"Does it only work on images of one fixed size? What about a whole map?"</p>
+        <p class="a">The model itself is fixed: it reads one 256-pixel picture at about 10 metres per
+          pixel, a 2.56 km square. Shrinking a bigger picture to fit would change the scale it was
+          trained on, and I measured that it is fragile to scale. So for a bigger area I use a
+          <em>sliding window</em>: the same 256-pixel frame is moved across the area half a frame at
+          a time, the model is asked the same question about every frame, and the answers are
+          combined by vote into a grid. A 10 km square is 49 windows and takes about 25 seconds on
+          this laptop; 20 km is 225 windows, about 45 seconds. It's a coarse map of what the windows
+          answered, each cell about 1.3 km wide. It is not an outline of anything.
+          <span class="flag">Be straight about this: I measured the models on single images, and on
+          Earth Engine pictures of single images (below), but I have <strong>not</strong> measured a
+          stitched large area against labels, because there are no labelled large areas to score
+          against. Don't claim it is accurate over a city. Also: scored window by window against OpenStreetMap water on 29 October, both models
+          said "yes" in <strong>all 49</strong> windows at Ahmedabad (water is mapped in 46, so 94% right),
+          in all 49 in rural Gujarat (water mapped in only 26, so 53% right) and in all 49 near Amsterdam
+          (all 49 have water). Across 147 windows neither model once said "no", so on a presence question
+          like water the grid tells you how common water is, not that the model can tell. OpenStreetMap is
+          an imperfect reference in rural India. Demo it with rural/urban, which the picture decides.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Is it connected to Google Earth? Is it real time?"</p>
+        <p class="a">It's connected to <strong>Google Earth Engine</strong>, which is the API Google
+          offers researchers to its satellite data. The old "Google Earth API" was shut down in 2015,
+          and Google Maps' own satellite pictures can't be used because their terms restrict
+          machine-learning use, so I didn't use those. Earth Engine is free for non-commercial research;
+          I registered the project as a B.Tech research project. Sir picks a place and a date range, it
+          fetches the newest clear Sentinel-2 view of it (the same satellite the models were trained
+          on), and the models answer the same questions. <strong>Not real time:</strong> Sentinel-2
+          passes over a place about every five days and clouds delay it, so it is "latest available"
+          (the app prints the newest scene's date), days to a few weeks old. If Earth Engine isn't
+          reachable the app falls back to a fixed 2020 cloud-free composite and says so.
+          <span class="flag">Don't say "live satellite feed" or "Google Earth imagery". Say "latest
+          Sentinel-2 from Google Earth Engine".</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Do the models answer as well on Earth Engine pictures as on the dataset?"</p>
+        <p class="a">I checked, because it wasn't safe to assume. For 40 test images I rebuilt the same
+          footprint from Earth Engine and asked the dataset's own yes/no and comparison questions about
+          both pictures. My first rendering lost 3.5 points (89.2% to about 85.5%) and made the
+          models say "no" more often: the dataset's pictures are hazier and smoother than the picture I
+          made. I matched the rendering to the dataset's pictures using <em>validation</em> images and
+          picture statistics only, no answers, then measured once on test: <strong>89.2% on the
+          dataset's image, 89.2% (cross-attention) and 88.0% (elementwise) on the Earth Engine
+          picture</strong>, and the two pictures gave the same answer 95-98% of the time.
+          <span class="flag">Limits: Netherlands only, yes/no and comparison only (counting wasn't
+          scored), 600 questions from 40 images so one point is noise, and the imagery is years newer
+          than the dataset's, so a small gap may be real change on the ground. The pass rule (within
+          3 points) was written down before looking.</span></p>
+      </div>
+
+      <div class="qa">
         <p class="q">"Can it show where the answer is — like segmentation?"</p>
         <p class="a">The model that answers can't — it only picks a label; it was never shown an
           outline of anything, and none of my datasets contain outlines. So I added a separate step

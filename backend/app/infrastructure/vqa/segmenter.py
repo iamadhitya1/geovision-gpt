@@ -101,12 +101,6 @@ _COLORS = {
 
 _METHOD_COLOUR_INDEX = "colour index (excess green) — not a trained model"
 _METHOD_CLIPSEG = "CLIPSeg zero-shot, text-prompted — not trained on this data"
-_METHOD_MAP_DATA = "OpenStreetMap map data for this location — not detected from the image"
-
-_CAVEAT_MAP_DATA = (
-    "Drawn from map data at this scene's coordinates, so it can be newer or older than the "
-    "imagery, and anything nobody has mapped is missing. It is not something the model found."
-)
 _CAVEAT_ROADS_DRAWN_WIDE = " Roads are drawn wider than they really are so they can be seen."
 _CAVEAT_GREEN_TYPES = (
     "Marks all green vegetation: from the image alone it can't tell forest from grass from "
@@ -255,10 +249,11 @@ class ZeroShotSegmenter:
                 else:
                     width = max(2, round(image.width / 128))
                     mask = rasterise(features, bounds, image.size, line_width=width)
-                    caveat = _CAVEAT_MAP_DATA + (
+                    method, source_caveat = self._map_data.describe(concept, bounds)
+                    caveat = source_caveat + (
                         _CAVEAT_ROADS_DRAWN_WIDE if concept is HighlightConcept.ROADS else ""
                     )
-                    return self._make_layer(concept, mask, _METHOD_MAP_DATA, caveat), mask
+                    return self._make_layer(concept, mask, method, caveat), mask
 
         # Image-based methods: used outright for vegetation and water, and as the fallback for
         # the things that prefer map data.

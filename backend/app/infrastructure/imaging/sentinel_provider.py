@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import io
 import math
+from datetime import date
 
 import httpx
 import numpy as np
@@ -25,11 +26,16 @@ from rasterio.io import MemoryFile
 from rasterio.transform import from_bounds
 
 from app.core.logging import get_logger
+from app.domain.enums import ImagerySource
 from app.domain.errors import ImageryUnavailableError
+from app.domain.interfaces import AreaScenePort
+from app.infrastructure.imaging.area_scene import MercatorAreaScene
 
 logger = get_logger(__name__)
 
 _TILE_PX = 256
+# Tiles requested from the imagery service at once; a 20 km area needs about a hundred.
+_MAX_CONCURRENT_TILES = 8
 _EARTH_CIRCUMFERENCE_M = 40_075_016.686
 _MERCATOR_RADIUS_M = 6_378_137.0
 
@@ -135,6 +141,36 @@ class EoxSentinel2Provider:
         )
 
     async def fetch_scene(self, latitude: float, longitude: float) -> bytes:
+        chip = await self._build_picture(latitude, longitude, self._size_px)
+        return await asyncio.to_thread(
+            _to_geotiff, chip, latitude, longitude, self._size_px, self._target_m
+        )
+
+    async def fetch_area(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        size_px: int,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> AreaScenePort:
+        """A bigger picture on the same grid as :meth:`fetch_scene`, for the sliding-window
+        analysis. The mosaic is one fixed 2020 composite, so the dates are ignored (and the
+        picture says so)."""
+        picture = await self._build_picture(latitude, longitude, size_px)
+        return MercatorAreaScene(
+            picture,
+            latitude=latitude,
+            longitude=longitude,
+            ground_m=self._target_m,
+            source=ImagerySource.SENTINEL_CLOUDLESS,
+            captured="a fixed 2020 cloud-free composite, not recent imagery",
+        )
+
+    async def _build_picture(self, latitude: float, longitude: float, size_px: int) -> Image.Image:
+        """The ``size_px`` x ``size_px`` picture, ``target_m`` of ground per pixel, centred on
+        the point: the mosaic's tiles stitched together and shrunk to that scale."""
         if abs(latitude) > MAX_LATITUDE or not -180.0 <= longitude <= 180.0:
             raise ImageryUnavailableError(
                 f"No imagery for ({latitude}, {longitude}): the imagery covers latitudes up to "
@@ -145,7 +181,7 @@ class EoxSentinel2Provider:
 
         zoom = choose_zoom(latitude, self._target_m, self._max_zoom)
         # How many pixels of this zoom make up the scene's ground footprint.
-        window = self._size_px * self._target_m / ground_resolution_m(latitude, zoom)
+        window = size_px * self._target_m / ground_resolution_m(latitude, zoom)
         centre_x, centre_y = mercator_pixel(latitude, longitude, zoom)
         left, top = centre_x - window / 2, centre_y - window / 2
 
@@ -160,9 +196,15 @@ class EoxSentinel2Provider:
             )
 
         wanted = [(x, y) for y in range(first_y, last_y + 1) for x in range(first_x, last_x + 1)]
-        images = await asyncio.gather(
-            *(self._fetch_tile(zoom, x % tiles_per_side, y) for x, y in wanted)
-        )
+        # A big area is a hundred tiles: fetch a few at a time so the imagery service isn't hit
+        # with them all at once.
+        gate = asyncio.Semaphore(_MAX_CONCURRENT_TILES)
+
+        async def fetch(x: int, y: int) -> Image.Image:
+            async with gate:
+                return await self._fetch_tile(zoom, x % tiles_per_side, y)
+
+        images = await asyncio.gather(*(fetch(x, y) for x, y in wanted))
 
         mosaic = Image.new(
             "RGB", ((last_x - first_x + 1) * _TILE_PX, (last_y - first_y + 1) * _TILE_PX)
@@ -176,7 +218,9 @@ class EoxSentinel2Provider:
             left - first_x * _TILE_PX + window,
             top - first_y * _TILE_PX + window,
         )
-        chip = mosaic.resize((self._size_px, self._size_px), Image.Resampling.LANCZOS, box=box)
+        picture = await asyncio.to_thread(
+            mosaic.resize, (size_px, size_px), Image.Resampling.LANCZOS, box
+        )
 
         logger.info(
             "imagery_scene_built",
@@ -184,10 +228,9 @@ class EoxSentinel2Provider:
             longitude=longitude,
             zoom=zoom,
             tiles=len(wanted),
+            size_px=size_px,
         )
-        return await asyncio.to_thread(
-            _to_geotiff, chip, latitude, longitude, self._size_px, self._target_m
-        )
+        return picture
 
     async def _fetch_tile(self, zoom: int, x: int, y: int) -> Image.Image:
         url = self._tile_url.format(z=zoom, x=x, y=y)

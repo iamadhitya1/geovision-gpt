@@ -606,6 +606,64 @@ Outcome: the loss stays in the code, off by default; no model, table or app beha
 further weights were tried. (The raw evaluation file is git-ignored with the other checkpoints; the
 numbers above are copied from it.)
 
+## Pictures from Google Earth Engine vs the dataset's own (2026-10-29)
+
+The app can analyse a place from recent Sentinel-2 imagery fetched from Google Earth Engine (see
+`backend/app/infrastructure/imaging/earth_engine_provider.py` and the root README). That is only
+fair to the models if the picture is shaped like what they were trained on, so this was measured,
+not assumed. `backend/scripts/ee_vs_dataset.py` takes RSVQA-LR test images (they are georeferenced),
+rebuilds the same 2.56 km footprint from Earth Engine, asks the dataset's own non-counting questions
+about **both** pictures with the deployed models, and scores each against the dataset's answers.
+
+The pass rule was written before looking: each model's accuracy on the Earth Engine picture within
+**3 points** of its accuracy on the dataset's own image, no tuning on the test images, and any
+adjustment to how the picture is made chosen on the **validation** split and then measured once on
+test.
+
+**First rendering** (surface-reflectance product, nearest-neighbour sampling, the usual 0-3000
+stretch): **not met.** On 40 random test images (600 yes/no and comparison questions):
+
+| | dataset image | Earth Engine picture |
+|---|---|---|
+| Cross-attention | 89.2% | 85.7% |
+| Elementwise | 89.2% | 85.3% |
+
+The models also said "yes" to presence questions far less often (78.7% of the time against 61.7%;
+the truth is 74.9%), worst for building presence (83% to 72%) and water presence.
+
+**Why, found without using any labels.** On 12 validation images the dataset's pictures are hazier
+(darkest 2% of pixels at 41, not 14), lower in contrast (standard deviation 17, 11, 9 per channel
+against 21, 21, 17) and much smoother (a sharpness measure of 37 against 111) than that rendering.
+Candidates were scored by how far their picture statistics (per-channel mean, spread, 2nd and 98th
+percentile, sharpness) were from the dataset's, as a fraction of the dataset's value:
+
+| Rendering | distance |
+|---|---|
+| Surface reflectance, nearest (first version) | 0.60 |
+| Top-of-atmosphere, nearest | 0.29 |
+| Top-of-atmosphere, bilinear | 0.28 |
+| Top-of-atmosphere, bicubic | 0.28 |
+
+Bilinear (a tie with bicubic) was kept, and the brightness stretch was raised from 3000 to 4250 so
+the average brightness matches (the top-of-atmosphere pictures were about 30% too bright at 3000).
+
+**Second rendering, measured once on the same 40 test images and seed: met.**
+
+| | dataset image | Earth Engine picture | same answer on both |
+|---|---|---|---|
+| Cross-attention | 89.2% | 89.2% | 97.7% |
+| Elementwise | 89.2% | 88.0% | 95.2% |
+
+Limits: the Netherlands only (the dataset's region), yes/no and comparison questions only
+(counting was not scored and the 2 rural/urban questions are too few to say anything), 600
+questions from 40 images so about one point is within noise, and the imagery is from 2026 against
+the dataset's older scenes, so a small gap may be real change on the ground as much as rendering.
+The first failed run did tell us something was off before the cause was found; the choice of
+rendering itself came from the validation statistics. **How well the models answer on a large area
+stitched from many windows has not been measured against labels.**
+
+**A first window-level check against OpenStreetMap (2026-10-29, `backend/scripts/water_vs_osm.py`).** For "Is there a water area?" over 10 km squares (49 windows each), with a window counted as having water if OpenStreetMap maps any river, canal, pond or lake in it: Ahmedabad (water in 46 of 49 windows), rural Gujarat (26 of 49) and the Amsterdam area (49 of 49). Both models answered "yes" in **all 49 windows at every place**: 94%, 53% and 100% correct, and not one "no" in 147 windows, so they were right only where water was and wrong on all 26 windows with none mapped. That is the base rate, not discrimination. Limits: OpenStreetMap under-maps small ponds in rural India, so 53% is not exact; three places, one question.
+
 ## Setup
 
 ```bash

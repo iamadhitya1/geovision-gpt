@@ -235,6 +235,34 @@ Base path `/api/v1`.
   as an upload. Imagery is Sentinel-2 cloudless by EOX IT Services GmbH, free for
   non-commercial use with attribution; needs internet. `GVG_IMAGERY_ENABLED=false` turns it
   off.
+- `POST /area/analyse` asks one question about a **square area up to 20 km wide**, not just one
+  256 px image. The models read a fixed 256 px window at about 10 m per pixel (2.56 km), and
+  shrinking a bigger picture to that size would change the scale they were trained on, so a
+  **sliding window** is used instead: the window moves across the area in half-window steps,
+  every window gets the same question, and the answers are combined by vote into a coarse grid
+  (cells 1.28 km wide) plus a share-of-the-area summary per model. It is a rough map of what the
+  windows answered, not an outline, and **how well the models answer on large areas has not
+  been measured against labels**. The Map page's **Larger area** mode draws it.
+  Where the pixels come from (`GET /area/capabilities` lists what this server has):
+  **Google Earth Engine** (the route Google offers researchers to its satellite data; free for
+  non-commercial research) gives the newest clear Sentinel-2 view of the place in a date range
+  you choose, "latest" meaning days to weeks old, never live; or the fixed 2020 EOX mosaic if
+  Earth Engine isn't set up. Google's own Maps/Earth basemap pictures are **not** used: their
+  terms restrict machine-learning use. To turn Earth Engine on: register at
+  <https://code.earthengine.google.com/register> as a non-commercial user, create a Google
+  Cloud project, then `uv pip install -e ".[earth-engine]"`, `earthengine --project
+  YOUR_PROJECT_ID authenticate` (a browser sign-in on that machine) and set
+  `GVG_EARTH_ENGINE_PROJECT=YOUR_PROJECT_ID` (in `backend/.env`, which is git-ignored).
+  `GVG_AREA_MAX_SIZE_KM` and `GVG_AREA_MAX_WINDOWS` cap how big a request may be; a 20 km
+  area is 225 windows and took about 45 s on the laptop CPU.
+  **Checked against labelled data:** the Earth Engine picture of a dataset image's footprint was
+  scored with the dataset's own questions. After correcting how the picture is rendered (the first
+  version, surface reflectance with the usual stretch, cost the models 3.5 points; the final
+  top-of-atmosphere rendering was matched to the dataset's pictures using validation images only),
+  accuracy on 40 test images was 89.2% on the dataset's image and 89.2% / 88.0%
+  (cross-attention / elementwise) on the Earth Engine picture. Netherlands only, yes/no and
+  comparison questions only; details and limits in [`ml/README.md`](ml/README.md).
+  `backend/scripts/ee_vs_dataset.py` reruns it.
 
 ### Modules 3/4 — questions, counting and highlighting
 

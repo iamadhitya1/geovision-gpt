@@ -24,6 +24,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.area_service import AreaAnalysisService
 from app.application.audit_service import AuditService
 from app.application.auth_service import AuthService
 from app.application.dto import RequestContext
@@ -34,9 +35,10 @@ from app.application.vqa_service import VqaService
 from app.core.config import Settings
 from app.core.logging import user_id_ctx
 from app.domain.entities import User
-from app.domain.enums import Role, TokenType
+from app.domain.enums import ImagerySource, Role, TokenType
 from app.domain.errors import AuthorizationError, InactiveUserError, InvalidTokenError
 from app.domain.interfaces import (
+    AreaImageryProvider,
     AuditRepository,
     Cache,
     ImageAnalyzer,
@@ -101,6 +103,10 @@ def get_vqa_model(request: Request) -> VqaModelPort:
 
 def get_imagery_provider(request: Request) -> ImageryProvider | None:
     return request.app.state.imagery  # type: ignore[no-any-return]
+
+
+def get_area_providers(request: Request) -> dict[ImagerySource, AreaImageryProvider]:
+    return request.app.state.area_providers  # type: ignore[no-any-return]
 
 
 def get_segmenter(request: Request) -> SegmentationPort | None:
@@ -322,3 +328,16 @@ require_admin = require_role(Role.ADMIN)
 
 ResearcherUser = Annotated[User, Depends(require_researcher)]
 AdminUser = Annotated[User, Depends(require_admin)]
+
+
+def get_area_service(
+    model: Annotated[VqaModelPort, Depends(get_vqa_model)],
+    providers: Annotated[dict[ImagerySource, AreaImageryProvider], Depends(get_area_providers)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> AreaAnalysisService:
+    return AreaAnalysisService(
+        model=model,
+        providers=providers,
+        max_size_km=settings.area_max_size_km,
+        max_windows=settings.area_max_windows,
+    )

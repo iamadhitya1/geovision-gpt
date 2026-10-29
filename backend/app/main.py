@@ -23,12 +23,17 @@ from app.application.password_policy import PasswordPolicy
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
-from app.domain.enums import FusionType
+from app.domain.concepts import HighlightConcept
+from app.domain.enums import FusionType, ImagerySource
+from app.domain.interfaces import AreaImageryProvider
 from app.infrastructure.bootstrap import ensure_first_admin
 from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
 from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
+from app.infrastructure.imaging.earth_engine_provider import EarthEngineProvider
+from app.infrastructure.imaging.open_buildings_provider import OpenBuildingsMapData
 from app.infrastructure.imaging.osm_provider import OverpassMapData
+from app.infrastructure.imaging.regional_map_data import RegionalMapData
 from app.infrastructure.imaging.sentinel_provider import EoxSentinel2Provider
 from app.infrastructure.security.password import Argon2PasswordHasher
 from app.infrastructure.security.tokens import JwtTokenService
@@ -168,6 +173,19 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         if settings.imagery_enabled
         else None
     )
+    # Where an area analysis gets its pixels: Google Earth Engine when a Cloud project is
+    # configured (recent imagery, any date range), and the fixed EOX mosaic otherwise.
+    area_providers: dict[ImagerySource, AreaImageryProvider] = {}
+    if app.state.imagery is not None:
+        area_providers[ImagerySource.SENTINEL_CLOUDLESS] = app.state.imagery
+    earth_engine: EarthEngineProvider | None = None
+    if settings.earth_engine_project:
+        earth_engine = EarthEngineProvider(
+            project=settings.earth_engine_project,
+            default_window_days=settings.earth_engine_window_days,
+        )
+        area_providers[ImagerySource.EARTH_ENGINE] = earth_engine
+    app.state.area_providers = area_providers
     app.state.map_data = (
         OverpassMapData(
             user_agent=settings.imagery_user_agent,
@@ -176,6 +194,17 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         if settings.map_data_enabled
         else None
     )
+    if earth_engine is not None and app.state.map_data is not None:
+        # In India OpenStreetMap barely maps buildings, so building outlines come from Google's
+        # Open Buildings (through Earth Engine); everywhere else OpenStreetMap is still used.
+        app.state.map_data = RegionalMapData(
+            regional=OpenBuildingsMapData(
+                earth_engine=earth_engine.client,
+                cache_dir=Path(settings.map_data_cache_dir) / "open_buildings",
+            ),
+            fallback=app.state.map_data,
+            concepts=frozenset({HighlightConcept.BUILDINGS}),
+        )
     app.state.segmenter = (
         ZeroShotSegmenter(
             clipseg_model_id=settings.segmentation_clipseg_model_id,
