@@ -127,7 +127,7 @@ honest answer: the models read one 256 px picture at about 10 m per pixel (2.56 
 bigger than that is covered by **sliding that window across it**, half a window at a time, asking
 every window the same question, and combining the answers. Search a place (Ahmedabad), pick **10 ×
 10 km** and the question **"Is it a rural or an urban area?"**, press **Analyse area**.
-**Don't use "Is there a water area?" in the larger-area demo.** On 29 Oct, scored window by window against OpenStreetMap water (river, canals, ponds), both models said "yes" in **all 49** windows at Ahmedabad (OpenStreetMap shows water in 46 of them, so 94% right), in all 49 in rural Gujarat (water in only 26, so 53% right) and in all 49 near Amsterdam (all 49 have water): across 147 windows neither model once said "no". So the water answer there reflects how common water is, not an ability to tell. OpenStreetMap is an imperfect reference in rural India (unmapped ponds), so 53% is not exact either. It takes about 25 s for
+**Stay inside Gujarat.** The models were fine-tuned on Gujarat tiles (2 Nov) and on 497 unseen test tiles are right about water, rural/urban and building-count ranges well above chance (balanced accuracy 80.5%, 82.7%, count 68%), but they were **not** trained for anywhere else, and forest (73.8%) fell short of the 80% bar. Good places: Ahmedabad, Surat, Rajkot, Vadodara, and a rural spot (rural/urban and the water question both give a spread now, not "yes everywhere"). Say the labels are WorldCover/JRC/GHSL/Open Buildings, not ground truth. It takes about 25 s for
 49 windows × 2 models. A grid appears: each cell coloured by what the windows over it answered
 (blue no / orange yes, fainter where windows disagreed), with the share of the area per model. If
 Google Earth Engine is set up the imagery line says so, with the newest scene's date ("latest
@@ -137,6 +137,8 @@ outline. I measured that Earth Engine pictures give the models the same accuracy
 own on 40 test images in the Netherlands; I have **not** measured large stitched areas against
 labels." Don't claim it finds objects. Expect the two models to disagree on some cells; that is
 real. Needs internet; run it once beforehand (the first call after start is slower).
+
+**4c. "Show where the buildings are" in Gujarat (1 min).** On a Gujarat scene, ask "Is there a building?" and press the highlight. In India the outlines are **Google Open Buildings** (the on-screen label says so); OpenStreetMap, which this used before, had 42 buildings where Open Buildings had 10,523 on nine Gujarat tiles. The first highlight for a place takes about 6-12 s (then it is cached). It is map data, detected by Google from different imagery, not what the answering model found.
 
 **5. Dashboard (1 min).** Model accuracy: elementwise vs. cross-attention fusion on the
 9,838-question held-out test set, broken down by question type; then the live usage figures.

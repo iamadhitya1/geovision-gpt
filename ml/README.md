@@ -664,6 +664,89 @@ stitched from many windows has not been measured against labels.**
 
 **A first window-level check against OpenStreetMap (2026-10-29, `backend/scripts/water_vs_osm.py`).** For "Is there a water area?" over 10 km squares (49 windows each), with a window counted as having water if OpenStreetMap maps any river, canal, pond or lake in it: Ahmedabad (water in 46 of 49 windows), rural Gujarat (26 of 49) and the Amsterdam area (49 of 49). Both models answered "yes" in **all 49 windows at every place**: 94%, 53% and 100% correct, and not one "no" in 147 windows, so they were right only where water was and wrong on all 26 windows with none mapped. That is the base rate, not discrimination. Limits: OpenStreetMap under-maps small ponds in rural India, so 53% is not exact; three places, one question.
 
+## Specialising for Gujarat (2026-10-29 to 2026-11-02)
+
+The project is scoped to Gujarat. A window-level check against OpenStreetMap (above) had shown the
+Netherlands-trained models answering "yes" to water everywhere, so the first step was to measure that
+properly and the second to fix it with Gujarat data. Nothing below is a claim about anywhere else.
+
+**Tiles.** `backend/scripts/gujarat_set.py` plans and `fetch`es 3,985 tiles: a 256 x 256 px picture at
+about 10 m per pixel (the app's own Earth Engine rendering) plus labels from Earth Engine's own
+layers: ESA WorldCover v200 (tree cover, water), JRC Global Surface Water (water seen in at least
+20% of observations since 1984), GHSL degree of urbanisation 2020 (classes 22, 23, 30 = urban) and
+Google Open Buildings v3 (a building count, confidence at least 0.7). A thing is "present" when it
+covers at least 0.5% of the 2.56 km tile; thresholds and labels are defined once, in
+`ml/dataset/gujarat_dataset.py`, used by training and scoring alike. Places were drawn half
+uniformly over a district, a quarter in urban areas and a quarter on water (otherwise there are
+almost no urban or water examples), each centre moved up to 1 km at random, and each picture taken
+in January-March (70%) or the weeks after the monsoon (30%). Splits are by whole district (FAO GAUL
+2015, 25 districts): train 14 districts / 2,987 tiles, validation 5 / 501, test 6 / 497; the big-city
+districts were dealt out separately so training sees cities too (a plain random split had put all of
+them in validation and test). The labels are model-made, not surveyed: WorldCover, for instance,
+labels some Kutch terrain as cropland, and the first labels (WorldCover alone) were replaced by these
+after a contact sheet showed a dry river bed labelled "no water". Counted against them, every figure
+is "agreement with those layers", not truth.
+
+**Before.** The old models on the 497 test tiles (balanced accuracy; the old elementwise said "yes"
+to water for 92% of tiles and was right about "no" 8% of the time):
+
+| | water | forest | rural/urban | building count (range) |
+|---|---|---|---|---|
+| Old elementwise | 49.6% | 53.4% | 73.4% | 51.3% |
+| Old cross-attention | 49.3% | 52.6% | 56.5% | 19.3% |
+
+**Training.** `scripts/train_generalist.py --datasets lr+hr+guj --init-from <existing checkpoint>`:
+fine-tuning from the existing model for 4 epochs, each epoch the whole of RSVQA-LR, 60,000 RSVQA-HR
+questions and the Gujarat training questions repeated `--guj-repeat` times, with the best epoch chosen
+on the **Gujarat validation districts** only (`--select-on guj`) and the LR and HR validation scores
+logged every epoch. A building count is trained as the answer-list number nearest to the true count
+in the same range. The scoring rule was written before any Gujarat model existed
+(`scripts/evaluate_gujarat.py`): balanced accuracy of at least 80% for water, forest and
+rural/urban, and building-count ranges above the commonest range; the test districts were scored once.
+
+| Run | Recipe | Validation balanced accuracy (water / forest / rural-urban) |
+|---|---|---|
+| A (elementwise) | lr 1e-4, Gujarat x4 | 79.75% / 84.1% / 84.8%: water missed by a quarter of a point |
+| **B (elementwise)** | lr 3e-4, Gujarat x8 | **81.2% / 83.7% / 86.9%**: all met; chosen (higher mean) |
+| C (cross-attention) | the recipe of B, nothing re-tuned | 77% / 84% / 88%: water short |
+
+Only B was chosen between alternatives, on validation. C is a second model trained with B's recipe and
+scored on test once as such.
+
+**Result on the six unseen test districts** (497 tiles; the oversampled mix):
+
+| | water | forest | rural/urban | building count (range) |
+|---|---|---|---|---|
+| Rule | 80% | 80% | 80% | above 39.4% |
+| **Gujarat elementwise (B)** | **80.5% met** | 73.8% **missed** | **82.7% met** | **68.0% met** |
+| **Gujarat cross-attention (C)** | 74.9% missed | 74.9% missed | **85.2% met** | **69.4% met** |
+
+**The pass rule is not met** (B misses forest; C misses water and forest). B's water rate is 70% of
+water found and 91% of dry tiles correctly called dry; before, 91% and 8%. On the tiles drawn
+uniformly over a district, which show the true base rates, the figures are lower: B water 69.9%,
+forest 70.5%, rural/urban 99.2% (only a handful of urban tiles), counts 63.9% against 63.1% for
+always naming the commonest range; so do not read the headline table as "accuracy over a random
+place". Forest is weakest because 84% of test tiles carry some tree cover under the label, in several
+dry districts (Jamnagar, Patan, Porbandar) the label is noisy, and the model says "yes" to most.
+
+**No forgetting** (B, `evaluate_generalist.py`): RSVQA-LR test 72.67% overall (first run 72.02%,
+four-run mean 72.56%), RSVQA-HR 82.74% (81.87% / 82.86%), Philadelphia, a city never trained on,
+78.05% (77.21% / 77.84%), and building counts in ranges on LR 65.3% (64.5%): all within the seed to
+seed spread of about 0.7 points, so "no measurable loss", not "improved". C's training-time
+validation scores on LR (73.6%) and HR (81.3%) look healthy; it has not had the full three-test-set
+evaluation.
+
+**In the app.** The check against OpenStreetMap water was repeated with B: it now says "yes" in 27 of
+49 windows at Ahmedabad and 10 of 49 in rural Gujarat (before: all 49, everywhere). It misses water
+OpenStreetMap lists in about 19 windows per place (thin canals and ponds): OpenStreetMap counts any
+mapped water, while the models were trained to say "yes" for about 0.5% of a tile, roughly 3 ha
+(what 10 m pixels can show), so that check is stricter than what they were trained for.
+
+**Limits.** One recipe family, two choices (A against B) made on validation; labels are model-made;
+Gujarat only (25 districts of FAO GAUL 2015, boundaries slightly out of date); pictures from 2026,
+two seasons; sampling oversamples urban and water; the pass rule was not met for forest or, for
+cross-attention, water; 497 test tiles from six districts, so a few points either way is noise.
+
 ## Setup
 
 ```bash

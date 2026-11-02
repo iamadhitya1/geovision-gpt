@@ -264,6 +264,41 @@ Base path `/api/v1`.
   comparison questions only; details and limits in [`ml/README.md`](ml/README.md).
   `backend/scripts/ee_vs_dataset.py` reruns it.
 
+### Specialised for Gujarat (2 November 2026)
+
+The project is scoped to **Gujarat**, not the world. The original models were trained on the
+Netherlands (and aerial pictures of a few US cities), and measured on 497 held-out Gujarat tiles they
+answered "yes" to almost every presence question (balanced accuracy about 50%, i.e. chance, for
+water and forest). They were fine-tuned on **3,985 labelled Gujarat tiles** (Sentinel-2 pictures
+from Earth Engine, labelled from ESA WorldCover, JRC surface water, GHSL settlement class and Google
+Open Buildings; train / validation / test are whole districts, 14 / 5 / 6, so the test result is on
+districts the model never saw), mixed with the original datasets so nothing is forgotten.
+
+Scored **once** on the six unseen test districts (balanced accuracy = mean of the "yes" rate and
+the "no" rate, so always-yes scores 50%; pass rule fixed in advance: at least 80% for water, forest
+and rural/urban, and building-count ranges above the commonest-range baseline):
+
+| Test districts | Old elementwise | **Gujarat elementwise** | Old cross-attention | **Gujarat cross-attention** |
+|---|---|---|---|---|
+| Water | 49.6% | **80.5%** | 49.3% | **74.9%** |
+| Forest | 53.4% | **73.8%** | 52.6% | **74.9%** |
+| Rural / urban | 73.4% | **82.7%** | 56.5% | **85.2%** |
+| Building count (range; baseline 39.4%) | 51.3% | **68.0%** | 19.3% | **69.4%** |
+
+**The pass rule is not fully met**: elementwise passes water, rural/urban and counts but not forest
+(73.8%); cross-attention passes rural/urban and counts only. On tiles drawn uniformly over a district
+(true base rates, not the oversampled mix) the numbers are lower (water about 65-70%), and the original
+test sets did not suffer (RSVQA-LR 72.67%, HR 82.74%, unseen-city Philadelphia 78.05% for the
+elementwise model, all inside the normal run-to-run spread). **The labels are model-made, not
+surveyed on the ground**, so every figure is accuracy against WorldCover, JRC, GHSL and Open
+Buildings. Full method and tables: [`ml/README.md`](ml/README.md). The fine-tuned checkpoints are
+git-ignored; point the app at them with `GVG_VQA_CHECKPOINT_ELEMENTWISE_PATH` and
+`GVG_VQA_CHECKPOINT_CROSS_ATTENTION_PATH` (in `backend/.env`).
+
+The "show where the buildings are" highlight now draws **Google Open Buildings** in India
+(OpenStreetMap had 42 buildings where Open Buildings had 10,523 on 9 Gujarat tiles) and says so on
+screen; OpenStreetMap is still used elsewhere.
+
 ### Modules 3/4 — questions, counting and highlighting
 
 - `POST /images/{id}/ask` answers with both fusion variants. **Counting questions** ("How

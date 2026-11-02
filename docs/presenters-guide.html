@@ -1824,12 +1824,7 @@
           <span class="flag">Be straight about this: I measured the models on single images, and on
           Earth Engine pictures of single images (below), but I have <strong>not</strong> measured a
           stitched large area against labels, because there are no labelled large areas to score
-          against. Don't claim it is accurate over a city. Also: scored window by window against OpenStreetMap water on 29 October, both models
-          said "yes" in <strong>all 49</strong> windows at Ahmedabad (water is mapped in 46, so 94% right),
-          in all 49 in rural Gujarat (water mapped in only 26, so 53% right) and in all 49 near Amsterdam
-          (all 49 have water). Across 147 windows neither model once said "no", so on a presence question
-          like water the grid tells you how common water is, not that the model can tell. OpenStreetMap is
-          an imperfect reference in rural India. Demo it with rural/urban, which the picture decides.</span></p>
+          against. Don't claim it is accurate over a city. That was the old, Netherlands-trained model, which said "yes" to water in almost every Gujarat tile (balanced accuracy 50%, chance). It has since been fine-tuned on Gujarat: see the Gujarat answer below.</span></p>
       </div>
 
       <div class="qa">
@@ -1862,6 +1857,33 @@
           scored), 600 questions from 40 images so one point is noise, and the imagery is years newer
           than the dataset's, so a small gap may be real change on the ground. The pass rule (within
           3 points) was written down before looking.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"Is it accurate in Gujarat? Why only Gujarat?"</p>
+        <p class="a">I scoped it to Gujarat on purpose: a proper dataset I can measure beats a claim
+          about the whole world. The original models were trained on the Netherlands, and on Gujarat
+          they answered "yes" to almost everything (balanced accuracy about 50%, which is chance). I
+          built 3,985 labelled Gujarat tiles from Earth Engine layers (WorldCover, JRC surface water,
+          GHSL settlement, Google Open Buildings), kept whole districts apart for validation and
+          testing, and fine-tuned both models. On six districts the model never saw, scored once:
+          elementwise <strong>water 80.5%, rural/urban 82.7%, building-count ranges 68%</strong>
+          (baseline 39%), forest 73.8%; cross-attention water 74.9%, rural/urban 85.2%, counts 69%,
+          forest 74.9%. The original datasets did not get worse (RSVQA-LR 72.7%, Philadelphia 78.1%).
+          <span class="flag">Say it straight: the pass rule I wrote beforehand (80% balanced accuracy on
+          water, forest and rural/urban) was <strong>not fully met</strong>: forest missed. On tiles
+          drawn evenly over a district the numbers are lower (water about 65-70%). The labels are
+          map products made by models, not surveyed on the ground, so these are agreements with those
+          layers. Don't claim it works outside Gujarat.</span></p>
+      </div>
+
+      <div class="qa">
+        <p class="q">"When I asked it to show where the buildings were, it looked wrong."</p>
+        <p class="a">That was a data-source problem, not the answering model. The highlight was drawing
+          OpenStreetMap, which has almost no buildings mapped in rural Gujarat: on nine Gujarat tiles
+          OpenStreetMap had 42 buildings and Google's Open Buildings had 10,523. In India it now draws
+          Google Open Buildings and says so on screen. It is detected from Google's own, higher
+          resolution imagery at a different date, so it can disagree a little with the picture.</p>
       </div>
 
       <div class="qa">
