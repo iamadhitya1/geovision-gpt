@@ -128,7 +128,7 @@ bigger than that is covered by **sliding that window across it**, half a window 
 every window the same question, and combining the answers. Search a place (Ahmedabad), pick **10 ×
 10 km** and the question **"Is it a rural or an urban area?"**, press **Analyse area**.
 **Stay inside Gujarat.** The models were fine-tuned on Gujarat tiles (2 Nov) and on 497 unseen test tiles are right about water, rural/urban and building-count ranges well above chance (balanced accuracy 80.5%, 82.7%, count 68%), but they were **not** trained for anywhere else, and forest (73.8%) fell short of the 80% bar. Good places: Ahmedabad, Surat, Rajkot, Vadodara, and a rural spot (rural/urban and the water question both give a spread now, not "yes everywhere"). Say the labels are WorldCover/JRC/GHSL/Open Buildings, not ground truth. It takes about 25 s for
-49 windows × 2 models. A grid appears: each cell coloured by what the windows over it answered
+49 windows × 2 models. **Click any square to zoom into that spot**: it fetches the 2.5 km scene around it and opens the normal workspace, where you can ask questions and press the highlight button (roads, buildings, water, forest...). That is how to go from the big picture to a highlight. A grid appears: each cell coloured by what the windows over it answered
 (blue no / orange yes, fainter where windows disagreed), with the share of the area per model. If
 Google Earth Engine is set up the imagery line says so, with the newest scene's date ("latest
 available", never "live": Sentinel-2 passes a place every ~5 days); otherwise it uses the fixed 2020

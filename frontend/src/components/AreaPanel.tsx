@@ -33,7 +33,16 @@ const SIZE_OPTIONS_KM = [5, 10, 15, 20];
 
 /** The coarse result grid, drawn on the map: each cell coloured by the answer most of the windows
  * over it gave, fainter where they disagreed. */
-export function AreaCells({ result, fusion }: { result: AreaAnalysis; fusion: FusionType }) {
+export function AreaCells({
+  result,
+  fusion,
+  onPick,
+}: {
+  result: AreaAnalysis;
+  fusion: FusionType;
+  /** Called with the centre of the square that was clicked. */
+  onPick?: (latitude: number, longitude: number) => void;
+}) {
   const view = result.results.find((r) => r.fusion === fusion);
   if (!view) return null;
   return (
@@ -48,13 +57,26 @@ export function AreaCells({ result, fusion }: { result: AreaAnalysis; fusion: Fu
               [south, west],
               [north, east],
             ]}
-            pathOptions={{ color: colour, weight: 0.5, fillColor: colour, fillOpacity: 0.15 + 0.45 * cell.agreement }}
+            pathOptions={{
+              color: colour,
+              weight: 0.5,
+              fillColor: colour,
+              fillOpacity: 0.15 + 0.45 * cell.agreement,
+              className: onPick ? "cursor-pointer" : undefined,
+            }}
+            eventHandlers={{ click: () => onPick?.((south + north) / 2, (west + east) / 2) }}
           >
             <Tooltip sticky>
               <strong>{cell.answer}</strong>
               <br />
               {Math.round(cell.agreement * 100)}% of {cell.windows} windows agreed ·{" "}
               {formatConfidence(cell.mean_confidence)} sure
+              {onPick && (
+                <>
+                  <br />
+                  <em>Click to open this spot with the highlight options</em>
+                </>
+              )}
             </Tooltip>
           </Rectangle>
         );
@@ -271,6 +293,10 @@ export function AreaPanel(props: AreaPanelProps) {
             ))}
           </div>
 
+          <p className="text-text">
+            Click any square on the map to open that spot (about 2.5 km) in the workspace, where you can
+            ask questions and highlight roads, buildings, water and more.
+          </p>
           {result.note && <p className="text-muted">{result.note}</p>}
           <p className="text-faint">
             {result.captured ? `Imagery: ${result.captured}. ` : ""}A rough map: each cell is about{" "}

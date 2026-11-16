@@ -213,6 +213,21 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
     }
   }
 
+  // A square clicked in the larger-area grid: capture the 2.5 km scene around its centre and open
+  // it in the normal workspace, where the highlights live.
+  async function openSpot(latitude: number, longitude: number) {
+    if (capturing) return;
+    setCapturing(true);
+    setNotice(null);
+    try {
+      const image = await api.captureScene(latitude, longitude);
+      router.push(`/images/${image.id}`);
+    } catch (err) {
+      setNotice(err instanceof ApiError ? err.message : "Couldn't fetch that spot. Try again.");
+      setCapturing(false);
+    }
+  }
+
   async function analyseArea() {
     if (!view || !canAnalyseArea) return;
     setAreaBusy(true);
@@ -277,7 +292,13 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
             interactive={false}
           />
         )}
-        {mode === "area" && areaResult && <AreaCells result={areaResult} fusion={areaFusion} />}
+        {mode === "area" && areaResult && (
+          <AreaCells
+            result={areaResult}
+            fusion={areaFusion}
+            onPick={(lat, lng) => void openSpot(lat, lng)}
+          />
+        )}
         {located.map(({ image, bounds }) => {
           const active = image.id === selectedId;
           return (
@@ -320,6 +341,11 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
       </form>
 
       <div className="absolute bottom-4 right-4 z-[1000] flex max-w-[calc(100%-2rem)] flex-col items-end gap-2">
+        {capturing && mode === "area" && (
+          <p className="max-w-xs rounded-sm border border-line bg-ink/95 px-3 py-2 text-xs text-muted">
+            Fetching that spot…
+          </p>
+        )}
         {notice && (
           <p role="alert" className="max-w-xs rounded-sm border border-danger/40 bg-ink/95 px-3 py-2 text-xs text-danger">
             {notice}
