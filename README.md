@@ -297,7 +297,13 @@ git-ignored; point the app at them with `GVG_VQA_CHECKPOINT_ELEMENTWISE_PATH` an
 
 The "show where the buildings are" highlight now draws **Google Open Buildings** in India
 (OpenStreetMap had 42 buildings where Open Buildings had 10,523 on 9 Gujarat tiles) and says so on
-screen; OpenStreetMap is still used elsewhere.
+screen. **Roads** in India come from the GRIP4 road inventory, also through Earth Engine: the free
+OpenStreetMap servers were at capacity on 16 Nov (39-47 s for a tiny query), so a road highlight at
+a place nobody had cached failed with "map data couldn't be reached"; it now takes 1-2 s.
+**Forest, grass and farmland** are drawn from the ESA WorldCover land-cover map (10 m classes: tree
+cover, grassland, cropland), also through Earth Engine, in about a second and anywhere in the
+world; OpenStreetMap is now only the fallback, then the picture. OpenStreetMap is still used for
+other things and for places outside India's roads and buildings coverage.
 
 ### Modules 3/4 — questions, counting and highlighting
 

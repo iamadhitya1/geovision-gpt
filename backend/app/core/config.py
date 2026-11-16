@@ -149,6 +149,11 @@ class Settings(BaseSettings):
     # Map data already fetched for a place is kept here, so a rehearsed place works
     # instantly (and offline) at the demo. Not in git.
     map_data_cache_dir: str = "./storage/map_cache"
+    # How long a highlight waits for the free public OpenStreetMap servers before giving up and
+    # falling back to the picture-based method. They are often at capacity (39-47 s for a tiny
+    # query on 16 Nov 2026), so a short wait gives a quick answer or a quick fallback instead of a
+    # long hang. Pieces already fetched are cached, so a second try carries on from there.
+    map_data_deadline_seconds: float = Field(default=8.0, ge=1.0, le=120.0)
     segmentation_clipseg_model_id: str = "CIDAS/clipseg-rd64-refined"
     # Load the segmentation weights in the background at startup instead of on the first
     # highlight click (which otherwise pauses for ~7 s). Off by default so tests and machines

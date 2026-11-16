@@ -31,10 +31,12 @@ from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
 from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
 from app.infrastructure.imaging.earth_engine_provider import EarthEngineProvider
+from app.infrastructure.imaging.grip4_roads_provider import Grip4RoadsMapData
 from app.infrastructure.imaging.open_buildings_provider import OpenBuildingsMapData
 from app.infrastructure.imaging.osm_provider import OverpassMapData
 from app.infrastructure.imaging.regional_map_data import RegionalMapData
 from app.infrastructure.imaging.sentinel_provider import EoxSentinel2Provider
+from app.infrastructure.imaging.worldcover_provider import WorldCoverLandCover
 from app.infrastructure.security.password import Argon2PasswordHasher
 from app.infrastructure.security.tokens import JwtTokenService
 from app.infrastructure.storage.factory import build_storage
@@ -190,26 +192,44 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         OverpassMapData(
             user_agent=settings.imagery_user_agent,
             cache_dir=Path(settings.map_data_cache_dir),
+            deadline_seconds=settings.map_data_deadline_seconds,
         )
         if settings.map_data_enabled
         else None
     )
     if earth_engine is not None and app.state.map_data is not None:
-        # In India OpenStreetMap barely maps buildings, so building outlines come from Google's
-        # Open Buildings (through Earth Engine); everywhere else OpenStreetMap is still used.
+        # In India OpenStreetMap barely maps buildings and its free servers are often at capacity,
+        # so building outlines come from Google's Open Buildings and roads from the GRIP4 road
+        # inventory (both through Earth Engine); everywhere else OpenStreetMap is still used.
         app.state.map_data = RegionalMapData(
-            regional=OpenBuildingsMapData(
+            regional=Grip4RoadsMapData(
                 earth_engine=earth_engine.client,
-                cache_dir=Path(settings.map_data_cache_dir) / "open_buildings",
+                cache_dir=Path(settings.map_data_cache_dir) / "grip4_roads",
             ),
-            fallback=app.state.map_data,
-            concepts=frozenset({HighlightConcept.BUILDINGS}),
+            fallback=RegionalMapData(
+                regional=OpenBuildingsMapData(
+                    earth_engine=earth_engine.client,
+                    cache_dir=Path(settings.map_data_cache_dir) / "open_buildings",
+                ),
+                fallback=app.state.map_data,
+                concepts=frozenset({HighlightConcept.BUILDINGS}),
+            ),
+            concepts=frozenset({HighlightConcept.ROADS}),
         )
+    land_cover = (
+        WorldCoverLandCover(
+            earth_engine=earth_engine.client,
+            cache_dir=Path(settings.map_data_cache_dir) / "worldcover",
+        )
+        if earth_engine is not None
+        else None
+    )
     app.state.segmenter = (
         ZeroShotSegmenter(
             clipseg_model_id=settings.segmentation_clipseg_model_id,
             device=settings.vqa_device,
             map_data=app.state.map_data,
+            land_cover=land_cover,
         )
         if settings.segmentation_enabled
         else None

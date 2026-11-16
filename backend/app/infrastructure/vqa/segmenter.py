@@ -42,7 +42,7 @@ from app.core.logging import get_logger
 from app.domain.concepts import HighlightConcept
 from app.domain.entities import ConceptHighlight, HighlightLayer, MapFeature
 from app.domain.errors import CorruptImageError, ImageryUnavailableError, ModelUnavailableError
-from app.domain.interfaces import MapDataPort
+from app.domain.interfaces import LandCoverPort, MapDataPort
 
 logger = get_logger(__name__)
 
@@ -69,6 +69,13 @@ _FROM_MAP_DATA = {
     HighlightConcept.GRASS,
     HighlightConcept.FARMLAND,
     HighlightConcept.CEMETERY,
+}
+# Forest, grass and farmland: a land-cover map answers these better and more reliably than the
+# free OpenStreetMap servers, so it is tried first (OpenStreetMap, then the picture, are fallbacks).
+_FROM_LAND_COVER = {
+    HighlightConcept.FOREST,
+    HighlightConcept.GRASS,
+    HighlightConcept.FARMLAND,
 }
 _VEGETATION_LIKE = {
     HighlightConcept.VEGETATION,
@@ -157,6 +164,15 @@ def rasterise(
     return np.asarray(np.asarray(canvas) > 127, dtype=bool)
 
 
+def _decode_mask(png: bytes, size: tuple[int, int]) -> np.ndarray:
+    """A land-cover PNG (255 where the land is of that kind) as a boolean mask of ``size``."""
+    with Image.open(io.BytesIO(png)) as opened:
+        grey = opened.convert("L")
+        if grey.size != size:
+            grey = grey.resize(size, Image.Resampling.NEAREST)
+        return np.asarray(grey) > 127
+
+
 # --- the segmenter ------------------------------------------------------------------------
 
 
@@ -169,10 +185,12 @@ class ZeroShotSegmenter:
         clipseg_model_id: str,
         device: str = "cpu",
         map_data: MapDataPort | None = None,
+        land_cover: LandCoverPort | None = None,
     ) -> None:
         self._model_id = clipseg_model_id
         self._device = torch.device("cuda" if device == "cuda" else "cpu")
         self._map_data = map_data
+        self._land_cover = land_cover
         self._lock = threading.Lock()
         self._processor: Any | None = None
         self._model: Any | None = None
@@ -235,6 +253,16 @@ class ZeroShotSegmenter:
     ) -> tuple[HighlightLayer, np.ndarray]:
         reason: str | None = None  # why map data wasn't used, if it wasn't
         caveat: str | None
+
+        if concept in _FROM_LAND_COVER and bounds is not None and self._land_cover is not None:
+            try:
+                png = await self._land_cover.mask(concept, bounds, image.size)
+            except ImageryUnavailableError:
+                pass  # fall through: OpenStreetMap, then the picture
+            else:
+                mask = await asyncio.to_thread(_decode_mask, png, image.size)
+                method, source_caveat = self._land_cover.describe(concept)
+                return self._make_layer(concept, mask, method, source_caveat), mask
 
         if concept in _FROM_MAP_DATA:
             if bounds is None:

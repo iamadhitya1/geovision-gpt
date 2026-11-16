@@ -71,6 +71,55 @@ export const COUNT_IN_RANGES = {
   cross_attention_runs: 3,
 };
 
+/**
+ * The Gujarat result: both models fine-tuned on 3,985 labelled Gujarat tiles, scored ONCE on the
+ * six test districts the models never saw (497 tiles), from `ml/README.md`. Balanced accuracy is
+ * the mean of the rate of correct "yes" answers and of correct "no" answers, so a model that always
+ * says the same thing scores 50% however common that answer is. Building count is the share placed
+ * in the right one of five ranges, against always naming the commonest range. The labels come from
+ * map products made by models (WorldCover, JRC surface water, GHSL, Google Open Buildings), not from
+ * a ground survey. The pass rule (80% balanced accuracy for water, forest and rural/urban; counts
+ * above the baseline) was fixed before any Gujarat model was trained.
+ */
+export const GUJARAT = {
+  testTiles: 497,
+  districts: 6,
+  passMark: 80,
+  countBaseline: 39.4,
+  /** The Gujarat elementwise model on the original RSVQA-LR test set (no measurable loss). */
+  elementwiseOnLr: 72.67,
+  rows: [
+    {
+      key: "water",
+      label: "Water area",
+      hint: "Is there a water area?",
+      old: { elementwise: 49.6, cross_attention: 49.3 },
+      now: { elementwise: 80.5, cross_attention: 74.9 },
+    },
+    {
+      key: "forest",
+      label: "Forest",
+      hint: "Is there a forest?",
+      old: { elementwise: 53.4, cross_attention: 52.6 },
+      now: { elementwise: 73.8, cross_attention: 74.9 },
+    },
+    {
+      key: "rural_urban",
+      label: "Rural / urban",
+      hint: "Is it a rural or an urban area?",
+      old: { elementwise: 73.4, cross_attention: 56.5 },
+      now: { elementwise: 82.7, cross_attention: 85.2 },
+    },
+    {
+      key: "count",
+      label: "Building count",
+      hint: "How many buildings are there? (in ranges)",
+      old: { elementwise: 51.3, cross_attention: 19.3 },
+      now: { elementwise: 68.0, cross_attention: 69.4 },
+    },
+  ],
+} as const;
+
 // `n` is the number of test questions of that type. It matters when reading the gaps:
 // rural/urban has only 100, so one model getting 11 more of them right moves that bar by 11
 // points — and, because "average accuracy" weights every type equally, moves the average too.

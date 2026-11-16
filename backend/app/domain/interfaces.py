@@ -290,6 +290,31 @@ class MapDataPort(Protocol):
 
 
 @runtime_checkable
+class LandCoverPort(Protocol):
+    """A land-cover map as a mask: where, in a picture of a known place, a kind of land is.
+
+    Real map data made by a model, not found in the picture and not by the answering model, so a
+    highlight drawn from it says so (:meth:`describe`).
+    """
+
+    def describe(self, concept: HighlightConcept) -> tuple[str, str]:
+        """``(method, caveat)`` to show with a highlight drawn from this source."""
+        ...
+
+    async def mask(
+        self,
+        concept: HighlightConcept,
+        bounds_wgs84: tuple[float, float, float, float],
+        size: tuple[int, int],
+    ) -> bytes:
+        """PNG bytes (8-bit grey, 255 where the land is of that kind) of ``size`` = (width,
+        height) covering ``bounds_wgs84`` = (west, south, east, north), north at the top. Raises
+        :class:`~app.domain.errors.ImageryUnavailableError` if the service can't be reached or
+        the concept isn't one it knows."""
+        ...
+
+
+@runtime_checkable
 class SegmentationPort(Protocol):
     """Finds where the things a question names appear in an image.
 

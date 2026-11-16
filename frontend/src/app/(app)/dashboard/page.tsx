@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { FUSION_ORDER, MODEL_INFO, formatConfidence } from "@/lib/models";
 import {
   COUNT_IN_RANGES,
+  GUJARAT,
   QUESTION_ONLY,
   QUESTION_TYPES,
   RESULTS,
@@ -49,6 +50,106 @@ function AccuracyBar({
   );
 }
 
+function GujaratBenchmark() {
+  const mark = GUJARAT.passMark;
+  const passes = (key: string, value: number) =>
+    key === "count" ? value > GUJARAT.countBaseline : value >= mark;
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="font-display text-xl font-bold tracking-tight">Accuracy in Gujarat</h2>
+        <p className="mt-1 text-sm text-muted">
+          What the app serves: both models fine-tuned on labelled Gujarat imagery, scored once on{" "}
+          {GUJARAT.districts} districts they never saw ({GUJARAT.testTiles} tiles). Balanced accuracy
+          averages the rate of correct &quot;yes&quot; and correct &quot;no&quot; answers, so always
+          saying the same thing scores 50%.
+        </p>
+      </div>
+
+      <div className="plate overflow-x-auto p-5">
+        <table className="w-full min-w-[36rem] text-sm">
+          <thead>
+            <tr className="font-mono text-[11px] uppercase tracking-wider text-faint">
+              <th className="pb-3 text-left font-normal">Question</th>
+              {FUSION_ORDER.map((f) => (
+                <th key={f} colSpan={2} className={`pb-3 text-center font-normal ${MODEL_INFO[f].text}`}>
+                  {MODEL_INFO[f].name}
+                </th>
+              ))}
+            </tr>
+            <tr className="font-mono text-[10px] uppercase tracking-wider text-faint">
+              <th />
+              {FUSION_ORDER.map((f) => (
+                <FragmentHeads key={f} />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {GUJARAT.rows.map((row) => (
+              <tr key={row.key} className="border-t border-line align-top">
+                <td className="py-3 pr-3">
+                  <div>{row.label}</div>
+                  <div className="text-[11px] text-faint">{row.hint}</div>
+                </td>
+                {FUSION_ORDER.map((f) => {
+                  const now = row.now[f];
+                  return (
+                    <td key={f} colSpan={2} className="py-3 text-center">
+                      <span className="font-mono text-xs tabular text-faint">{row.old[f].toFixed(1)}%</span>
+                      <span className="mx-1.5 text-faint">→</span>
+                      <span
+                        className={`font-mono text-sm font-semibold tabular ${
+                          passes(row.key, now) ? "text-ok" : "text-text"
+                        }`}
+                      >
+                        {now.toFixed(1)}%
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="mt-5 space-y-2 border-t border-line pt-4 text-xs leading-relaxed text-muted">
+          <p>
+            <span className="text-text">Old → Gujarat model.</span> Green means the pass rule fixed
+            beforehand was met: at least {mark}% balanced accuracy for water, forest and rural/urban, and
+            building counts placed in the right range more often than always naming the commonest range
+            ({GUJARAT.countBaseline}%). <span className="text-text">It is not fully met:</span> forest
+            misses for both models, and water for cross-attention. The old models, trained on the
+            Netherlands, said &quot;yes&quot; to almost every presence question in Gujarat, which is why
+            they sit near 50% (chance).
+          </p>
+          <p>
+            <span className="text-text">Read these with care.</span> The tiles include extra urban and
+            water examples; on tiles drawn evenly over a district the figures are lower (water about
+            65–70%). The right answers come from map products made by models, not from a ground survey.
+            Gujarat only. About {GUJARAT.testTiles} tiles from {GUJARAT.districts} districts leave a few
+            points of noise in every figure.
+          </p>
+          <p>
+            <span className="text-text">The original data was not harmed:</span> the Gujarat elementwise
+            model scores {GUJARAT.elementwiseOnLr}% on the original RSVQA-LR test set, within the
+            run-to-run spread of the figures below. The Gujarat cross-attention model has not had that
+            check.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FragmentHeads() {
+  return (
+    <>
+      <th className="pb-2 text-right font-normal">old</th>
+      <th className="pb-2 text-left font-normal">Gujarat</th>
+    </>
+  );
+}
+
 function Benchmark() {
   const base = RESULTS.elementwise;
   const cross = RESULTS.cross_attention;
@@ -57,11 +158,15 @@ function Benchmark() {
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="font-display text-xl font-bold tracking-tight">Model accuracy</h2>
+        <h2 className="font-display text-xl font-bold tracking-tight">
+          Original models: accuracy on RSVQA-LR
+        </h2>
         <p className="mt-1 text-sm text-muted">
-          Measured on RSVQA-LR&apos;s held-out test split ({TEST_SET_SIZE.toLocaleString()} questions the
-          models never saw during training). Each figure is the mean of {SEEDS} separate training
-          runs; ± is how much those runs differed.
+          The models <em>before</em> the Gujarat fine-tuning, trained on the Netherlands (and aerial
+          US cities) and measured on RSVQA-LR&apos;s held-out test split ({TEST_SET_SIZE.toLocaleString()}{" "}
+          questions the models never saw during training). Each figure is the mean of {SEEDS} separate
+          training runs; ± is how much those runs differed. The app now serves the Gujarat versions
+          shown above.
         </p>
       </div>
 
@@ -270,6 +375,7 @@ export default function DashboardPage() {
         <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted">How well the models perform, and how you&apos;ve been using them.</p>
       </div>
+      <GujaratBenchmark />
       <Benchmark />
       <Usage />
     </div>

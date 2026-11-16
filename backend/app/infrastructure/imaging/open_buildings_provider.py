@@ -52,7 +52,7 @@ CAVEAT = (
 Bounds = tuple[float, float, float, float]
 
 
-def _split(bounds: Bounds, n: int) -> list[Bounds]:
+def split_bounds(bounds: Bounds, n: int) -> list[Bounds]:
     west, south, east, north = bounds
     dx, dy = (east - west) / n, (north - south) / n
     return [
@@ -133,7 +133,7 @@ class OpenBuildingsMapData:
 
     def _fetch_sync(self, bounds: Bounds) -> list[MapFeature]:
         ee = self._earth_engine() if callable(self._earth_engine) else self._earth_engine
-        pieces = _split(bounds, _GRID)
+        pieces = split_bounds(bounds, _GRID)
         # The pieces are independent requests, mostly waiting on Google: a few at a time.
         with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
             parts = list(pool.map(lambda piece: self._piece(ee, piece, depth=1), pieces))
@@ -151,7 +151,9 @@ class OpenBuildingsMapData:
             return parse_polygons(collection.getInfo()["features"])
         except Exception as exc:
             if "5000" in str(exc) and depth < _MAX_DEPTH:  # too dense for one request: split it
-                return [f for sub in _split(piece, 2) for f in self._piece(ee, sub, depth + 1)]
+                return [
+                    f for sub in split_bounds(piece, 2) for f in self._piece(ee, sub, depth + 1)
+                ]
             raise
 
     # --- disk cache -------------------------------------------------------------------------
