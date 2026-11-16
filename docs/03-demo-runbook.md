@@ -109,10 +109,10 @@ that is where the model's attention went, **not** where the answer is (on a wate
 can light up the green fields). If asked, say so.
 
 **4. Map and live map (2–3 min).** Map → your uploaded scene sits at its real location;
-toggle Dark / Satellite / **Sentinel-2** (the last is the imagery the models actually see).
+toggle Dark / Satellite / **Sentinel-2** (the last is a fixed 2020 composite, for display only: **Analyse** fetches the newest clear Sentinel-2 view from Google Earth Engine instead).
 Type a city in the search box (e.g. **Ahmedabad**) and press Go → the map flies there and a
 dashed square shows the 2.5 km area that will be analysed → **Analyse this place** → a
-Sentinel-2 scene is fetched and opens in the same Q&A workspace. Ask "Is there a water area?"
+Sentinel-2 scene is fetched (the newest clear view from Earth Engine, about 10-25 s, labelled on the image page; the fixed 2020 composite only if Earth Engine can't be reached) and opens in the same Q&A workspace. Ask "Is there a water area?"
 and highlight it: the river is outlined. Say: "This is the same scale as the data the models
 were trained on — I deliberately don't feed them a sharp Google-Earth screenshot, because the
 robustness study shows they're fragile to scale." Needs internet and takes a few seconds.

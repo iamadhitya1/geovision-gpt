@@ -17,7 +17,8 @@ from httpx import AsyncClient
 from PIL import Image
 from rasterio.io import MemoryFile
 
-from app.domain.entities import User
+from app.domain.entities import CapturedScene, User
+from app.domain.enums import ImagerySource
 from app.domain.errors import ImageryUnavailableError
 from app.infrastructure.imaging.sentinel_provider import (
     EoxSentinel2Provider,
@@ -82,7 +83,9 @@ async def test_scene_is_a_256_pixel_georeferenced_geotiff_centred_on_the_point()
     provider = _provider(handler)
     latitude, longitude = 52.9554, 5.7743
 
-    data = await provider.fetch_scene(latitude, longitude)
+    captured = await provider.fetch_scene(latitude, longitude)
+    data = captured.data
+    assert captured.source is ImagerySource.SENTINEL_CLOUDLESS
 
     with MemoryFile(data) as memory, memory.open() as scene:
         assert (scene.width, scene.height, scene.count) == (256, 256, 3)
@@ -129,12 +132,13 @@ async def test_places_outside_coverage_are_refused_without_calling_the_service(
 
 
 class FakeImageryProvider:
-    def __init__(self) -> None:
+    def __init__(self, source: ImagerySource = ImagerySource.SENTINEL_CLOUDLESS) -> None:
         self.requested: list[tuple[float, float]] = []
+        self._source = source
 
-    async def fetch_scene(self, latitude: float, longitude: float) -> bytes:
+    async def fetch_scene(self, latitude: float, longitude: float) -> CapturedScene:
         self.requested.append((latitude, longitude))
-        return make_geotiff_bytes(width=64, height=64, band_count=3)
+        return CapturedScene(make_geotiff_bytes(width=64, height=64, band_count=3), self._source)
 
 
 async def test_capture_stores_a_scene_as_the_callers_own_image(
@@ -226,9 +230,84 @@ async def test_the_predicted_footprint_matches_the_scene_that_is_actually_built(
     from app.infrastructure.imaging.sentinel_provider import scene_bounds_wgs84
 
     provider = _provider(lambda _r: httpx.Response(200, content=_jpeg_tile((20, 120, 40))))
-    data = await provider.fetch_scene(latitude, longitude)
+    data = (await provider.fetch_scene(latitude, longitude)).data
 
     with MemoryFile(data) as memory, memory.open() as scene:
         actual = transform_bounds(scene.crs, "EPSG:4326", *scene.bounds)
 
     assert scene_bounds_wgs84(latitude, longitude) == pytest.approx(actual, abs=1e-6)
+
+
+# --- Earth Engine as the source of "Analyse this place" -----------------------------------------
+
+
+async def test_an_earth_engine_scene_is_a_256_px_geotiff_on_the_same_grid() -> None:
+    from app.infrastructure.imaging.earth_engine_provider import EarthEngineProvider
+    from tests.test_area_analysis import FakeEarthEngine, _png
+
+    provider = EarthEngineProvider(project="p", ee_module=FakeEarthEngine(png=_png(256, alpha=255)))
+    latitude, longitude = 23.0225, 72.5714
+
+    captured = await provider.fetch_scene(latitude, longitude)
+
+    assert captured.source is ImagerySource.EARTH_ENGINE
+    with MemoryFile(captured.data) as memory, memory.open() as scene:
+        assert (scene.width, scene.height, scene.count) == (256, 256, 3)
+        assert scene.crs == rasterio.crs.CRS.from_epsg(3857)
+        left, _bottom, right, _top = scene.bounds
+        centre_x = math.radians(longitude) * 6_378_137.0
+        assert (left + right) / 2 == pytest.approx(centre_x, abs=1.0)
+        # 2.56 km on the ground, stretched by 1 / cos(latitude) in Web Mercator.
+        assert right - left == pytest.approx(2560 / math.cos(math.radians(latitude)), rel=1e-6)
+
+
+async def test_the_fallback_uses_earth_engine_and_only_then_the_old_mosaic() -> None:
+    from app.infrastructure.imaging.fallback_scene_provider import FallbackSceneProvider
+
+    earth = FakeImageryProvider(ImagerySource.EARTH_ENGINE)
+    mosaic = FakeImageryProvider(ImagerySource.SENTINEL_CLOUDLESS)
+
+    captured = await FallbackSceneProvider(primary=earth, fallback=mosaic).fetch_scene(23.0, 72.5)
+
+    assert captured.source is ImagerySource.EARTH_ENGINE
+    assert mosaic.requested == []
+
+
+async def test_when_earth_engine_is_down_the_old_mosaic_is_used_and_says_so() -> None:
+    from app.infrastructure.imaging.fallback_scene_provider import FallbackSceneProvider
+
+    class Down(FakeImageryProvider):
+        async def fetch_scene(self, latitude, longitude):
+            raise ImageryUnavailableError("down")
+
+    mosaic = FakeImageryProvider(ImagerySource.SENTINEL_CLOUDLESS)
+
+    captured = await FallbackSceneProvider(primary=Down(), fallback=mosaic).fetch_scene(23.0, 72.5)
+
+    assert captured.source is ImagerySource.SENTINEL_CLOUDLESS
+    assert mosaic.requested == [(23.0, 72.5)]
+
+
+async def test_if_both_sources_fail_the_error_is_reported() -> None:
+    from app.infrastructure.imaging.fallback_scene_provider import FallbackSceneProvider
+
+    class Down(FakeImageryProvider):
+        async def fetch_scene(self, latitude, longitude):
+            raise ImageryUnavailableError("down")
+
+    with pytest.raises(ImageryUnavailableError):
+        await FallbackSceneProvider(primary=Down(), fallback=Down()).fetch_scene(23.0, 72.5)
+
+
+async def test_a_captured_earth_engine_scene_is_named_after_its_source(
+    app, client: AsyncClient, researcher: User
+) -> None:
+    app.state.imagery = FakeImageryProvider(ImagerySource.EARTH_ENGINE)
+    headers = await auth_headers(client, researcher.email, USER_PASSWORD)
+
+    response = await client.post(
+        "/images/capture", headers=headers, json={"latitude": 23.0225, "longitude": 72.5714}
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["original_filename"] == "sentinel2ee_23.0225N_72.5714E.tif"

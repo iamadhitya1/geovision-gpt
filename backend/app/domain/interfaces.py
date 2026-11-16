@@ -19,6 +19,7 @@ from app.domain.concepts import HighlightConcept
 from app.domain.entities import (
     AttentionHeatmap,
     AuditEvent,
+    CapturedScene,
     ConceptHighlight,
     ImageMetadata,
     MapFeature,
@@ -211,8 +212,8 @@ class ImageryProvider(Protocol):
     of a very high-resolution map, which they were never shown.
     """
 
-    async def fetch_scene(self, latitude: float, longitude: float) -> bytes:
-        """GeoTIFF bytes (EPSG:3857, 3 bands, 8-bit) centred on the point. Raises
+    async def fetch_scene(self, latitude: float, longitude: float) -> CapturedScene:
+        """A GeoTIFF (EPSG:3857, 3 bands, 8-bit) centred on the point, with its source. Raises
         :class:`~app.domain.errors.ImageryUnavailableError` if the imagery service can't be
         reached or has nothing there."""
         ...

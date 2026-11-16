@@ -26,6 +26,7 @@ from rasterio.io import MemoryFile
 from rasterio.transform import from_bounds
 
 from app.core.logging import get_logger
+from app.domain.entities import CapturedScene
 from app.domain.enums import ImagerySource
 from app.domain.errors import ImageryUnavailableError
 from app.domain.interfaces import AreaScenePort
@@ -86,7 +87,7 @@ def scene_bounds_wgs84(
     )
 
 
-def _to_geotiff(
+def to_geotiff(
     chip: Image.Image, latitude: float, longitude: float, size_px: int, ground_m: float
 ) -> bytes:
     """EPSG:3857 GeoTIFF whose extent is the scene's real footprint. Web Mercator stretches
@@ -140,11 +141,12 @@ class EoxSentinel2Provider:
             timeout=timeout_seconds, headers={"User-Agent": user_agent}
         )
 
-    async def fetch_scene(self, latitude: float, longitude: float) -> bytes:
+    async def fetch_scene(self, latitude: float, longitude: float) -> CapturedScene:
         chip = await self._build_picture(latitude, longitude, self._size_px)
-        return await asyncio.to_thread(
-            _to_geotiff, chip, latitude, longitude, self._size_px, self._target_m
+        data = await asyncio.to_thread(
+            to_geotiff, chip, latitude, longitude, self._size_px, self._target_m
         )
+        return CapturedScene(data, ImagerySource.SENTINEL_CLOUDLESS)
 
     async def fetch_area(
         self,

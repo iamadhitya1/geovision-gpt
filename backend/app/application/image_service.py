@@ -17,7 +17,7 @@ from app.application.audit_service import AuditService
 from app.application.dto import RequestContext
 from app.core.logging import get_logger
 from app.domain.entities import SatelliteImage, User
-from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImageStatus
+from app.domain.enums import AuditAction, AuditOutcome, ImageFormat, ImagerySource, ImageStatus
 from app.domain.errors import (
     AuthorizationError,
     FileTooLargeError,
@@ -149,12 +149,14 @@ class ImageService:
             raise ImageryUnavailableError(
                 "Fetching imagery from the map isn't enabled on this server."
             )
-        data = await self._imagery.fetch_scene(latitude, longitude)
+        scene = await self._imagery.fetch_scene(latitude, longitude)
+        # The file name carries the source, so the image page can credit the right one.
+        prefix = "sentinel2ee" if scene.source is ImagerySource.EARTH_ENGINE else "sentinel2"
         filename = (
-            f"sentinel2_{abs(latitude):.4f}{'N' if latitude >= 0 else 'S'}"
+            f"{prefix}_{abs(latitude):.4f}{'N' if latitude >= 0 else 'S'}"
             f"_{abs(longitude):.4f}{'E' if longitude >= 0 else 'W'}.tif"
         )
-        return await self.upload(owner=owner, filename=filename, data=data, context=context)
+        return await self.upload(owner=owner, filename=filename, data=scene.data, context=context)
 
     async def _process(
         self, image: SatelliteImage, data: bytes, context: RequestContext | None

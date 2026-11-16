@@ -365,7 +365,7 @@ export default function MapView({ images }: { images: SatelliteImage[] }) {
                   : "Analyse this place"}
             </button>
             <p className="max-w-xs rounded-sm bg-ink/80 px-2 py-1 text-right font-mono text-[10px] leading-snug text-muted backdrop-blur">
-              Analyses the dashed 2.5 km square, from Sentinel-2 imagery at ~10 m per pixel — the scale
+              Analyses the dashed 2.5 km square, from the newest clear Sentinel-2 view (Google Earth Engine) at ~10 m per pixel — the scale
               the models were trained on.
             </p>
           </>

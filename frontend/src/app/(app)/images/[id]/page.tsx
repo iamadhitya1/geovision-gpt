@@ -34,9 +34,13 @@ function Readout({ image }: { image: SatelliteImage }) {
     if (m.cloud_cover_percent !== null) rows.push(["Cloud cover", `${m.cloud_cover_percent.toFixed(1)}%`]);
   }
   rows.push(["Format", `${image.image_format} · ${formatBytes(image.file_size_bytes)}`]);
-  // Scenes captured from the map are Sentinel-2 cloudless imagery, whose licence requires this.
-  if (image.original_filename.startsWith("sentinel2_")) {
-    rows.push(["Imagery", "Sentinel-2 cloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020)"]);
+  // Scenes captured from the map name their source in the file name. Google Earth Engine's are the
+  // newest clear Sentinel-2 view; the fixed EOX composite (whose licence requires this credit) is
+  // only the fallback when Earth Engine can't be reached.
+  if (image.original_filename.startsWith("sentinel2ee_")) {
+    rows.push(["Imagery", "Sentinel-2 from Google Earth Engine, newest clear view (contains modified Copernicus Sentinel data)"]);
+  } else if (image.original_filename.startsWith("sentinel2_")) {
+    rows.push(["Imagery", "Sentinel-2 cloudless by EOX IT Services GmbH (a fixed 2020 composite; contains modified Copernicus Sentinel data 2020)"]);
   }
 
   return (

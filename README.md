@@ -232,9 +232,11 @@ Base path `/api/v1`.
   `GVG_STORAGE_BACKEND=minio`, same `ObjectStorage` port either way.
 - `POST /images/capture` fetches a Sentinel-2 scene for a latitude/longitude (the Map page's
   **Analyse this place**) and stores it as the caller's own image, through the same pipeline
-  as an upload. Imagery is Sentinel-2 cloudless by EOX IT Services GmbH, free for
-  non-commercial use with attribution; needs internet. `GVG_IMAGERY_ENABLED=false` turns it
-  off.
+  as an upload. The scene is the newest clear Sentinel-2 view from Google Earth Engine when it is set
+  up (the same rendering the Gujarat models were fine-tuned on), with the fixed 2020 Sentinel-2
+  cloudless composite by EOX IT Services GmbH (free for non-commercial use with attribution) as the
+  fallback; the image page says which was used. Needs internet. `GVG_IMAGERY_ENABLED=false` turns
+  the fallback off.
 - `POST /area/analyse` asks one question about a **square area up to 20 km wide**, not just one
   256 px image. The models read a fixed 256 px window at about 10 m per pixel (2.56 km), and
   shrinking a bigger picture to that size would change the scale they were trained on, so a

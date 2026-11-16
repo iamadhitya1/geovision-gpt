@@ -42,10 +42,12 @@ from typing import Any
 from PIL import Image
 
 from app.core.logging import get_logger
+from app.domain.entities import CapturedScene
 from app.domain.enums import ImagerySource
 from app.domain.errors import ImageryUnavailableError
 from app.domain.interfaces import AreaScenePort
 from app.infrastructure.imaging.area_scene import MercatorAreaScene
+from app.infrastructure.imaging.sentinel_provider import to_geotiff
 
 logger = get_logger(__name__)
 
@@ -135,6 +137,20 @@ class EarthEngineProvider:
         end = date_to or datetime.now(UTC).date()
         start = date_from or end - timedelta(days=self._default_days)
         return await asyncio.to_thread(self._fetch_sync, latitude, longitude, size_px, start, end)
+
+    async def fetch_scene(self, latitude: float, longitude: float) -> CapturedScene:
+        """One 256 px scene (the models' input size) as a GeoTIFF, for "Analyse this place": the
+        same newest-clear-view picture and rendering as the larger-area analysis."""
+        scene = await self.fetch_area(latitude, longitude, size_px=256)
+        data = await asyncio.to_thread(self._geotiff, scene, latitude, longitude)
+        return CapturedScene(data, ImagerySource.EARTH_ENGINE)
+
+    def _geotiff(self, scene: AreaScenePort, latitude: float, longitude: float) -> bytes:
+        chip = Image.open(io.BytesIO(scene.crop_png(0, 0, 256)))
+        return to_geotiff(chip, latitude, longitude, 256, self._ground_m)
+
+    async def aclose(self) -> None:
+        """Nothing to close: the Earth Engine client holds no connection of ours."""
 
     def client(self) -> Any:
         """The signed-in ``ee`` module, for other Earth Engine-backed sources to share (blocking

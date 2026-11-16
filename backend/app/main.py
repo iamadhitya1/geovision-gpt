@@ -31,6 +31,7 @@ from app.infrastructure.cache.factory import build_cache
 from app.infrastructure.db.session import create_all, create_engine, create_session_factory
 from app.infrastructure.imaging.analyzer import RasterImageAnalyzer
 from app.infrastructure.imaging.earth_engine_provider import EarthEngineProvider
+from app.infrastructure.imaging.fallback_scene_provider import FallbackSceneProvider
 from app.infrastructure.imaging.grip4_roads_provider import Grip4RoadsMapData
 from app.infrastructure.imaging.open_buildings_provider import OpenBuildingsMapData
 from app.infrastructure.imaging.osm_provider import OverpassMapData
@@ -188,6 +189,14 @@ def build_state(app: FastAPI, settings: Settings) -> None:
         )
         area_providers[ImagerySource.EARTH_ENGINE] = earth_engine
     app.state.area_providers = area_providers
+    if earth_engine is not None:
+        # "Analyse this place": the newest Earth Engine scene, the fixed mosaic only if it fails.
+        eox = app.state.imagery
+        app.state.imagery = (
+            earth_engine
+            if eox is None
+            else FallbackSceneProvider(primary=earth_engine, fallback=eox)
+        )
     app.state.map_data = (
         OverpassMapData(
             user_agent=settings.imagery_user_agent,

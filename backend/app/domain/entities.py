@@ -13,7 +13,15 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from app.domain.enums import AuditAction, AuditOutcome, FusionType, ImageFormat, ImageStatus, Role
+from app.domain.enums import (
+    AuditAction,
+    AuditOutcome,
+    FusionType,
+    ImageFormat,
+    ImagerySource,
+    ImageStatus,
+    Role,
+)
 
 
 def _now() -> datetime:
@@ -220,6 +228,15 @@ class AttentionHeatmap:
     confidence: float
     grid_size: int
     weights: tuple[float, ...]  # length grid_size * grid_size
+
+
+@dataclass(frozen=True, slots=True)
+class CapturedScene:
+    """One satellite scene as GeoTIFF bytes, and which imagery source it came from, so that what is
+    said about the imagery is always the source that was really used."""
+
+    data: bytes
+    source: ImagerySource
 
 
 @dataclass(frozen=True, slots=True)
